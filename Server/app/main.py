@@ -12,8 +12,8 @@ from tkinter import ttk, messagebox
 from pynput import keyboard as pynput_kb
 
 import mappings as store
-import macro_runner
-import bluetooth_spp
+import macro_runner as macro_runner
+import bluetooth_spp as bluetooth_spp
 
 # ── theme ─────────────────────────────────────────────────────────────────────
 BG         = "#0f0f0f"
@@ -97,7 +97,8 @@ class KeyRecorder:
         self._done   = False
         self._listener = pynput_kb.Listener(
             on_press=self._on_press,
-            on_release=self._on_release)
+            on_release=self._on_release,
+            suppress = True)
         self._listener.start()
 
     def stop(self):
@@ -398,22 +399,38 @@ class GesturePuckApp:
         win = tk.Toplevel(self.root)
         win.title("Add Gesture")
         win.configure(bg=BG)
-        win.geometry("320x200")
+        win.geometry("320x230")
         win.grab_set()
 
-        fields = [
-            ("GESTURE ID  (e.g. BTN3)", tk.StringVar()),
-            ("LABEL  (e.g. Screenshot)",  tk.StringVar()),
-            ("MACRO  — type or use REC",  tk.StringVar()),
-        ]
-        for lbl, var in fields:
-            tk.Label(win, text=lbl, font=FONT_LABEL,
-                     bg=BG, fg=TEXT_DIM).pack(anchor="w", padx=20, pady=(10, 2))
-            tk.Entry(win, textvariable=var, font=FONT_MONO, bg=SURFACE,
-                     fg=TEXT, insertbackground=ACCENT,
-                     relief="flat", bd=0).pack(fill="x", padx=20)
+        tk.Label(win, text="GESTURE ID  (e.g. BTN3)", font=FONT_LABEL,
+                    bg=BG, fg=TEXT_DIM).pack(anchor="w", padx=20, pady=(10, 2))
+        g_var = tk.StringVar()
+        tk.Entry(win, textvariable=g_var, font=FONT_MONO, bg=SURFACE,
+                    fg=TEXT, insertbackground=ACCENT,
+                    relief="flat", bd=0).pack(fill="x", padx=20)
 
-        g_var, l_var, m_var = fields[0][1], fields[1][1], fields[2][1]
+        tk.Label(win, text="LABEL  (e.g. Screenshot)", font=FONT_LABEL,
+                    bg=BG, fg=TEXT_DIM).pack(anchor="w", padx=20, pady=(10, 2))
+        l_var = tk.StringVar()
+        tk.Entry(win, textvariable=l_var, font=FONT_MONO, bg=SURFACE,
+                    fg=TEXT, insertbackground=ACCENT,
+                    relief="flat", bd=0).pack(fill="x", padx=20)
+
+        tk.Label(win, text="MACRO  — type or press REC", font=FONT_LABEL,
+                    bg=BG, fg=TEXT_DIM).pack(anchor="w", padx=20, pady=(10, 2))
+
+        m_var = tk.StringVar()
+        m_entry = tk.Entry(win, textvariable=m_var, font=FONT_MONO, bg=SURFACE,
+                            fg=TEXT, insertbackground=ACCENT,
+                            relief="flat", bd=0)
+        m_entry.pack(fill="x", padx=20)
+
+        btn_row = tk.Frame(win, bg=BG)
+        btn_row.pack(pady=10)
+
+        mk_btn(btn_row, "⏺ REC",
+                lambda: self._start_record("_add_popup", m_var, m_entry),
+                bg=BORDER, fg=YELLOW).pack(side="left", padx=4)
 
         def confirm():
             g = g_var.get().strip()
@@ -422,12 +439,15 @@ class GesturePuckApp:
             if not g or not m:
                 messagebox.showwarning("Empty", "Gesture ID and macro are required.", parent=win)
                 return
+            if "recording" in m:
+                messagebox.showwarning("Still Recording", "Finish recording first.", parent=win)
+                return
             self.mappings[g] = {"label": l, "macro": m}
             store.save(self.mappings)
             self._rebuild_rows()
             win.destroy()
 
-        mk_btn(win, "ADD", confirm).pack(pady=12)
+        mk_btn(btn_row, "ADD", confirm).pack(side="left", padx=4)
 
     def _prompt_map(self, gesture: str):
         if not messagebox.askyesno("New Gesture",
