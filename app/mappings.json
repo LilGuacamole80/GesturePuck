@@ -1,3 +1,10 @@
 {
-    "BTN1": "ctrl + shift + s"
+    "Gesture 1": {
+        "label": "screenshot",
+        "macro": "win+shift+s"
+    },
+    "Gesture 2": {
+        "label": "Gesture 2",
+        "macro": "ctrl + c"
+    }
 }

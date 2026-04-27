@@ -5,18 +5,18 @@
 #include <BLE2902.h>
 
 // Nordic UART Service (NUS) — standard BLE serial protocol
-#define SERVICE_UUID        "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
-#define CHARACTERISTIC_TX   "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"  // ESP32 → app
+#define SERVICE_UUID "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
+#define CHARACTERISTIC_TX "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"  
 
-BLEServer*         pServer   = nullptr;
-BLECharacteristic* pTX       = nullptr;
-bool               connected = false;
+BLEServer* pServer = nullptr;
+BLECharacteristic* pTX = nullptr;
+bool connected = false;
 
-const int BUTTON_PINS[]     = {13};
-const char* BUTTON_EVENTS[] = {"BTN1"};
-const int BUTTON_COUNT      = 1;
+const int BUTTON_PINS[] = {13, 33};
+const char* BUTTON_EVENTS[] = {"Gesture 1", "Gesture 2"};
+const int BUTTON_COUNT = 2;
 
-const unsigned long DEBOUNCE_MS          = 40;
+const unsigned long DEBOUNCE_MS = 40;
 
 bool stableStates[BUTTON_COUNT];
 bool lastReadings[BUTTON_COUNT];
@@ -42,15 +42,13 @@ void sendEvent(const char* event) {
     }
 }
 
-// ── setup ─────────────────────────────────────────────────────────────────────
-
 void setup() {
     Serial.begin(115200);
 
     for (int i = 0; i < BUTTON_COUNT; i++) {
         pinMode(BUTTON_PINS[i], INPUT_PULLUP);
-        stableStates[i]    = HIGH;
-        lastReadings[i]    = HIGH;
+        stableStates[i] = HIGH;
+        lastReadings[i] = HIGH;
         lastChangeTimes[i] = 0;
     }
 
@@ -76,8 +74,6 @@ void setup() {
     Serial.println("GesturePuck ready — BLE advertising");
 }
 
-// ── loop ──────────────────────────────────────────────────────────────────────
-
 void loop() {
     unsigned long now = millis();
 
@@ -85,7 +81,7 @@ void loop() {
         bool reading = digitalRead(BUTTON_PINS[i]);
 
         if (reading != lastReadings[i]) {
-            lastReadings[i]    = reading;
+            lastReadings[i] = reading;
             lastChangeTimes[i] = now;
         }
 
