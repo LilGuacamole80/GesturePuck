@@ -14,10 +14,10 @@
             <span id="company-name">GESTUREPUCK</span></div>
         <div class="gesture-box">
                 <ul class="nav-bar">
-                <li class="nav-item"><a href="#home">Dashboard</a></li>
-                <li class="nav-item"><a href="#about">Gestures</a></li>
-                <li class="nav-item"><a href="#login">Devices</a></li>
-                <li class="nav-item"><a href="#login">Settings</a></li>
+                <li class="nav-item"><a href="/login">Dashboard</a></li>
+                <li class="nav-item"><a href="/gestures">Gestures</a></li>
+                <li class="nav-item"><a href="/devices">Devices</a></li>
+                <li class="nav-item"><a href="/settings">Settings</a></li>
             </ul>
         </div>
     </nav>
@@ -26,12 +26,10 @@
     <div class="side-bar">
         <div class="side-item"></div>
     </div>
-
+    <h1 style="color: white; font-family: sans-serif; margin-left: 50px;">Welcome, {{ username }}!</h1>
     <h1 style="color: white; font-family: sans-serif; margin-left: 50px;">Gestures</h1>
     <p style="color: gray; font-family: sans-serif; margin-left: 50px;">Manage your gestures, customize actions, create your own!</p>
-    <button style="color: white; font-family: sans-serif; background: linear-gradient(to right, #8dd8f6, #da29e7); border-radius: 5px; padding: 5px; margin-left: 50px;">
-        Add Custom Gesture
-    </button>
+    
 
     <h2 style="color: white; font-family: sans-serif; margin-left: 50px;">Default Gestures</h2>
     <p style="color: gray; font-family: sans-serif; margin-left: 50px;">Ready to use gestures</p>
@@ -155,6 +153,9 @@
 <div class="default-gesture-flex-item">
         <span class="gesture-flex-item-item">Fist</span>
         <span class="gesture-flex-item-item" id="gesture-description">Make a fist right above the puck</span>
-    </div>
+</div>
+<button style="color: white; font-family: sans-serif; background: linear-gradient(to right, #8dd8f6, #da29e7); border-radius: 5px; padding: 5px; margin-left: 50px;">
+        Add Custom Gesture
+</button>
 </body>
 </html>

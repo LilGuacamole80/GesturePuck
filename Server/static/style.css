@@ -338,3 +338,12 @@ img{
 #gesture-description{
   color: gray;
 }
+
+.download-section{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 50px;
+}
+

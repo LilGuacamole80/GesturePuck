@@ -1,0 +1,10 @@
+{
+    "Gesture 1": {
+        "label": "Gesture 1",
+        "macro": "emergency"
+    },
+    "Gesture 2": {
+        "label": "Gesture 2",
+        "macro": "obs_scene_2"
+    }
+}

@@ -1,0 +1,130 @@
+{
+    "Global" :{
+        "Gesture 1": {
+            "label": "Volume Up",
+            "macro": ""
+        },
+        "Gesture 2": {
+            "label": "Volume Down",
+            "macro": ""
+        },
+        "Gesture 3": {
+            "label": "Screenshot",
+            "macro": "cmd+shift+3"
+        },
+        "Gesture 4": {
+            "label": "Brightness Up",
+            "macro": ""
+        },
+        "Gesture 5": {
+            "label": "Brightness Down",
+            "macro": ""
+        },
+        "Gesture 6": {
+            "label": "Move Window Left",
+            "macro": ""
+        },
+        "Gesture 7": {
+            "label": "Move Window Right",
+            "macro": ""
+        },
+        "Gesture 8": {
+            "label": "Screenshot",
+            "macro": "win+shift+s"
+        },
+        "Gesture 9": {
+            "label": "Screenshot",
+            "macro": "win+shift+s"
+        },
+        "Gesture 10": {
+            "label": "Screenshot",
+            "macro": "win+shift+s"
+        }
+    },
+
+    "Figma" :{
+        "Gesture 1": {
+            "label": "Change Color",
+            "macro": ""
+        },
+        "Gesture 2": {
+            "label": "Change Size",
+            "macro": ""
+        },
+        "Gesture 3": {
+            "label": "Screenshot",
+            "macro": "cmd+shift+3"
+        },
+        "Gesture 4": {
+            "label": "Brightness Up",
+            "macro": ""
+        },
+        "Gesture 5": {
+            "label": "Brightness Down",
+            "macro": ""
+        },
+        "Gesture 6": {
+            "label": "Move Window Left",
+            "macro": ""
+        },
+        "Gesture 7": {
+            "label": "Move Window Right",
+            "macro": ""
+        },
+        "Gesture 8": {
+            "label": "Screenshot",
+            "macro": "win+shift+s"
+        },
+        "Gesture 9": {
+            "label": "Screenshot",
+            "macro": "win+shift+s"
+        },
+        "Gesture 10": {
+            "label": "Screenshot",
+            "macro": "win+shift+s"
+        }
+    },
+
+    "Adobe Photoshop" :{
+        "Gesture 1": {
+            "label": "Volume Up",
+            "macro": ""
+        },
+        "Gesture 2": {
+            "label": "Volume Down",
+            "macro": ""
+        },
+        "Gesture 3": {
+            "label": "Screenshot",
+            "macro": "cmd+shift+3"
+        },
+        "Gesture 4": {
+            "label": "Brightness Up",
+            "macro": ""
+        },
+        "Gesture 5": {
+            "label": "Brightness Down",
+            "macro": ""
+        },
+        "Gesture 6": {
+            "label": "Move Window Left",
+            "macro": ""
+        },
+        "Gesture 7": {
+            "label": "Move Window Right",
+            "macro": ""
+        },
+        "Gesture 8": {
+            "label": "Screenshot",
+            "macro": "win+shift+s"
+        },
+        "Gesture 9": {
+            "label": "Screenshot",
+            "macro": "win+shift+s"
+        },
+        "Gesture 10": {
+            "label": "Screenshot",
+            "macro": "win+shift+s"
+        }
+    }
+}

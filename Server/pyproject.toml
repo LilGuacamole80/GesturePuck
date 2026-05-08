@@ -6,5 +6,17 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "bleak>=0.21",
+    "dotenv>=0.9.9",
+    "fastapi>=0.136.1",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.6",
+    "obsws-python>=1.8.0",
+    "pyautogui>=0.9.54",
     "pynput>=1.7",
+    "pyserial>=3.5",
+    "requests>=2.33.1",
+    "serial>=0.0.97",
+    "starlette>=1.0.0",
+    "templates>=0.0.5",
+    "uvicorn>=0.46.0",
 ]
