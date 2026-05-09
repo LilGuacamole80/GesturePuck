@@ -1,0 +1,13 @@
+[project]
+name = "app"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "bleak>=3.0.2",
+    "psutil>=7.2.2",
+    "py-bt>=1.2.1",
+    "pyinstaller>=6.20.0",
+    "pynput>=1.8.1",
+]

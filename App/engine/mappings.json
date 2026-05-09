@@ -1,0 +1,16 @@
+{
+    "Gesture 1": {
+        "label": "Gesture 1",
+        "macro": ""
+    },
+    "Google Slides": {
+        "Gesture 1": {
+            "label": "Gesture 1",
+            "macro": "right"
+        },
+        "Gesture 2": {
+            "label": "Gesture 2",
+            "macro": ""
+        }
+    }
+}
