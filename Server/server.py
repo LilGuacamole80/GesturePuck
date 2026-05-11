@@ -15,7 +15,7 @@ import hashlib
 from urllib.parse import urlencode
 import httpx
 import uuid
-import mysql.connector
+import psycopg2
 
 OIDC_CLIENT_ID = os.environ["OIDC_CLIENT_ID"]
 OIDC_CLIENT_SECRET = os.environ["OIDC_CLIENT_SECRET"]
@@ -52,11 +52,12 @@ def settings(request: Request):
     return templates.TemplateResponse(request, "careers.html")
 
 def get_db():
-    conn = mysql.connector.connect(
+    conn = psycopg2.connect(
         host=os.environ["DB_HOST"],
+        port=os.environ["DB_PORT"],
         user=os.environ["DB_USER"],
         password=os.environ["DB_PASSWORD"],
-        database=os.environ["DB_NAME"],
+        dbname=os.environ["DB_NAME"],
     )
     try:
         yield conn

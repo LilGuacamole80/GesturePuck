@@ -12,6 +12,7 @@ dependencies = [
     "jinja2>=3.1.6",
     "mysql-connector-python>=8.0.28",
     "obsws-python>=1.8.0",
+    "psycopg2-binary>=2.9.12",
     "pyautogui>=0.9.54",
     "pynput>=1.7",
     "pyserial>=3.5",
