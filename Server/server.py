@@ -16,6 +16,7 @@ from urllib.parse import urlencode
 import httpx
 import uuid
 import psycopg2
+import psycopg2.extras
 
 OIDC_CLIENT_ID = os.environ["OIDC_CLIENT_ID"]
 OIDC_CLIENT_SECRET = os.environ["OIDC_CLIENT_SECRET"]
@@ -124,7 +125,7 @@ def callback(code: str, state: str, request: Request, conn=Depends(get_db)):
     picture = userinfo.get("picture", "")
 
     # Upsert user: create if new, update if existing
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cursor.execute("SELECT id FROM users WHERE sub = %s", (sub,))
     existing = cursor.fetchone()
     if existing:
