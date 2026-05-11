@@ -31,20 +31,29 @@ except ImportError:
     bluetooth_spp = _BT
 
 
-BG         = "#0f0f0f"
-SURFACE    = "#1a1a1a"
-BORDER     = "#2a2a2a"
-ACCENT     = "#00e5a0"
-ACCENT_DIM = "#009966"
-TEXT       = "#f0f0f0"
-TEXT_DIM   = "#888888"
-RED        = "#ff4f4f"
-YELLOW     = "#f0c040"
+# ── PALETTE ────────────────────────────────────────────────────────────────────
+BG          = "#080808"   # near-black background
+SURFACE     = "#111111"   # card / sidebar surface
+SURFACE2    = "#1a1a1a"   # slightly lighter surface (hover, row alt)
+BORDER      = "#222222"   # hairline borders
+ACCENT      = "#2BC2F0"   # cyan — primary accent
+ACCENT2     = "#da29e7"   # purple — secondary accent
+ACCENT_DIM  = "#1a7a9a"   # dimmed cyan for active nav
+TEXT        = "#f0f0f0"   # primary text
+TEXT_DIM    = "#555555"   # muted / label text
+TEXT_MED    = "#999999"   # medium text
+MACRO_CLR   = "#a78bfa"   # soft purple for macro values
+REC_CLR     = "#f87171"   # soft red for recording state
+SAVE_CLR    = "#34d399"   # soft green for save button
+DEL_CLR     = "#f87171"   # soft red for delete
 
-FONT_MONO  = ("Courier New", 10)
-FONT_LABEL = ("Courier New", 9)
-FONT_TITLE = ("Courier New", 13, "bold")
-FONT_BTN   = ("Courier New", 9, "bold")
+# ── FONTS ──────────────────────────────────────────────────────────────────────
+FONT_MONO   = ("Courier New", 10)
+FONT_LABEL  = ("Courier New", 9)
+FONT_TITLE  = ("Courier New", 13, "bold")
+FONT_BTN    = ("Courier New", 9, "bold")
+FONT_NAV    = ("Courier New", 10)
+FONT_BADGE  = ("Courier New", 8, "bold")
 
 
 PYNPUT_KEY_NAMES = {
@@ -86,25 +95,56 @@ for _k in ("cmd_l", "cmd_r"):
         MODIFIER_KEYS.add(_v)
 
 
-def mk_btn(parent, text, command, bg=ACCENT, fg=BG):
-    return tk.Button(
-        parent, text=text, command=command,
+# ── WIDGET HELPERS ─────────────────────────────────────────────────────────────
+def mk_btn(parent, text, command, bg=ACCENT, fg=BG, width=None):
+    kw = dict(
+        text=text, command=command,
         bg=bg, fg=fg, font=FONT_BTN,
-        relief="flat", padx=8, pady=4, cursor="hand2"
+        relief="flat", padx=8, pady=3,
+        cursor="hand2", bd=0,
+        highlightthickness=0,
+        activebackground=bg,
+        activeforeground=fg,
     )
+    if width:
+        kw["width"] = width
+    btn = tk.Button(parent, **kw)
+
+    def on_enter(e):
+        try:
+            r, g, b = btn.winfo_rgb(bg)
+            lighter = "#{:02x}{:02x}{:02x}".format(
+                min(255, r // 256 + 30),
+                min(255, g // 256 + 30),
+                min(255, b // 256 + 30),
+            )
+            btn.config(bg=lighter)
+        except Exception:
+            pass
+
+    def on_leave(e):
+        btn.config(bg=bg)
+
+    btn.bind("<Enter>", on_enter)
+    btn.bind("<Leave>", on_leave)
+    return btn
 
 
-# A single long-lived listener, started once at app boot. The Tk UI "arms" the
-# recorder for the next chord; the listener thread pushes the captured chord
-# onto a queue, and Tk polls the queue from the main loop. This avoids
-# repeatedly creating/destroying CGEventTaps, which is what was causing the
-# SIGTRAP on macOS.
+def mk_separator(parent, color=BORDER):
+    return tk.Frame(parent, bg=color, height=1)
+
+
+def mk_label(parent, text, fg=TEXT_DIM, font=FONT_LABEL, bg=BG, **kw):
+    return tk.Label(parent, text=text, bg=bg, fg=fg, font=font, **kw)
+
+
+# ── KEY RECORDER ───────────────────────────────────────────────────────────────
 class GlobalKeyRecorder:
     def __init__(self):
         self._armed = False
-        self._lock = threading.Lock()
+        self._lock  = threading.Lock()
         self._chord: list[str] = []
-        self._held: set = set()
+        self._held:  set       = set()
         self._token = 0
         self.results: queue.Queue = queue.Queue()
         self._listener = pynput_kb.Listener(
@@ -119,14 +159,14 @@ class GlobalKeyRecorder:
         with self._lock:
             self._armed = True
             self._chord = []
-            self._held = set()
+            self._held  = set()
             self._token = token
 
     def cancel(self):
         with self._lock:
             self._armed = False
             self._chord = []
-            self._held = set()
+            self._held  = set()
 
     def _canonical(self, key):
         if key in PYNPUT_KEY_NAMES:
@@ -156,14 +196,15 @@ class GlobalKeyRecorder:
             token = self._token
             self._armed = False
             self._chord = []
-            self._held = set()
+            self._held  = set()
         self.results.put((token, chord))
 
 
+# ── MAIN APP ───────────────────────────────────────────────────────────────────
 class GesturePuckApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Gesture Puck")
+        self.root.title("GesturePuck")
         sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
         self.root.geometry(f"{sw}x{sh}")
         self.root.configure(bg=BG)
@@ -173,14 +214,13 @@ class GesturePuckApp:
         self.connection   = None
         self.current_page = "Global"
 
-        self._macro_vars: dict[str, tk.StringVar]  = {}
-        self._label_vars: dict[str, tk.StringVar]  = {}
-        self._entries:    dict[str, tk.Entry]      = {}
+        self._macro_vars: dict[str, tk.StringVar] = {}
+        self._label_vars: dict[str, tk.StringVar] = {}
+        self._entries:    dict[str, tk.Entry]     = {}
         self._next_token  = 1
         self._pending: dict[int, str] = {}
 
-        self.recorder = GlobalKeyRecorder()
-
+        self.recorder     = GlobalKeyRecorder()
         self.status       = tk.StringVar(value="NOT CONNECTED")
         self.last_gesture = tk.StringVar(value="—")
         self.device_var   = tk.StringVar()
@@ -190,74 +230,161 @@ class GesturePuckApp:
         self._scan_devices()
         self.root.after(50, self._poll_recorder)
 
+    # ── BUILD ──────────────────────────────────────────────────────────────────
     def _build_ui(self):
-        top = tk.Frame(self.root, bg=BG)
-        top.pack(fill="x", padx=20, pady=(10, 0))
-        tk.Label(top, text="GESTURE PUCK", bg=BG, fg=ACCENT,
-                 font=FONT_TITLE).pack(side="left")
-        tk.Label(top, textvariable=self.status, bg=BG, fg=TEXT_DIM,
-                 font=FONT_LABEL).pack(side="right")
+        # ── TOP BAR ───────────────────────────────────────────────────────────
+        topbar = tk.Frame(self.root, bg=SURFACE, height=52)
+        topbar.pack(fill="x")
+        topbar.pack_propagate(False)
 
-        dev = tk.Frame(self.root, bg=SURFACE)
-        dev.pack(fill="x", padx=20, pady=6)
-        self.combo = ttk.Combobox(dev, textvariable=self.device_var, state="readonly")
-        self.combo.pack(side="left", fill="x", expand=True, padx=(4, 4))
-        mk_btn(dev, "SCAN",    self._scan_devices, bg=BORDER, fg=TEXT).pack(side="left", padx=2)
-        mk_btn(dev, "CONNECT", self._connect).pack(side="left", padx=2)
+        # logo dot + wordmark
+        logo_area = tk.Frame(topbar, bg=SURFACE)
+        logo_area.pack(side="left", padx=(20, 0))
 
-        gf = tk.Frame(self.root, bg=BG)
-        gf.pack(fill="x", padx=20, pady=(4, 8))
-        tk.Label(gf, text="LAST GESTURE", bg=BG, fg=TEXT_DIM,
-                 font=FONT_LABEL).pack(side="left")
-        tk.Label(gf, textvariable=self.last_gesture, bg=BG, fg=ACCENT,
-                 font=("Courier New", 14, "bold")).pack(side="left", padx=10)
+        dot_canvas = tk.Canvas(logo_area, width=14, height=14,
+                               bg=SURFACE, highlightthickness=0)
+        dot_canvas.pack(side="left", pady=18)
+        dot_canvas.create_oval(1, 1, 13, 13, outline=ACCENT, width=2)
 
+        tk.Label(logo_area, text="  G E S T U R E P U C K", bg=SURFACE, fg=TEXT,
+                 font=("Courier New", 12, "bold"),
+                 ).pack(side="left")
+
+        # status pill
+        pill = tk.Frame(topbar, bg=SURFACE)
+        pill.pack(side="right", padx=20)
+        self._status_dot = tk.Canvas(pill, width=8, height=8,
+                                     bg=SURFACE, highlightthickness=0)
+        self._status_dot.pack(side="left", pady=20)
+        self._status_dot.create_oval(0, 0, 8, 8, fill=TEXT_DIM, outline="")
+        self._status_lbl = tk.Label(pill, textvariable=self.status,
+                                    bg=SURFACE, fg=TEXT_DIM, font=FONT_LABEL)
+        self._status_lbl.pack(side="left", padx=(4, 0))
+
+        # ── DEVICE BAR ────────────────────────────────────────────────────────
+        devbar = tk.Frame(self.root, bg=BORDER, height=1)
+        devbar.pack(fill="x")
+
+        devrow = tk.Frame(self.root, bg=BG)
+        devrow.pack(fill="x", padx=20, pady=8)
+
+        mk_label(devrow, "DEVICE", fg=TEXT_DIM).pack(side="left", padx=(0, 8))
+
+        style = ttk.Style()
+        style.theme_use("default")
+        style.configure("Dark.TCombobox",
+                         fieldbackground=SURFACE,
+                         background=SURFACE,
+                         foreground=TEXT,
+                         selectbackground=SURFACE2,
+                         selectforeground=TEXT,
+                         arrowcolor=ACCENT)
+
+        self.combo = ttk.Combobox(devrow, textvariable=self.device_var,
+                                  state="readonly", style="Dark.TCombobox",
+                                  width=32)
+        self.combo.pack(side="left", padx=(0, 8))
+
+        mk_btn(devrow, "SCAN",    self._scan_devices,
+               bg=SURFACE2, fg=TEXT_MED).pack(side="left", padx=(0, 4))
+        mk_btn(devrow, "CONNECT", self._connect,
+               bg=ACCENT,   fg=BG).pack(side="left")
+
+        # gesture pill
+        gf = tk.Frame(devrow, bg=BG)
+        gf.pack(side="right")
+        mk_label(gf, "LAST GESTURE", fg=TEXT_DIM).pack(side="left")
+        self._gesture_badge = tk.Label(
+            gf, textvariable=self.last_gesture,
+            bg=SURFACE2, fg=ACCENT,
+            font=("Courier New", 11, "bold"),
+            padx=10, pady=2,
+        )
+        self._gesture_badge.pack(side="left", padx=(8, 0))
+
+        mk_separator(self.root).pack(fill="x")
+
+        # ── BODY ──────────────────────────────────────────────────────────────
         body = tk.Frame(self.root, bg=BG)
         body.pack(fill="both", expand=True)
 
-        sidebar = tk.Frame(body, bg=SURFACE, width=180)
-        sidebar.pack(side="left", fill="y", padx=(10, 0))
+        # sidebar
+        sidebar = tk.Frame(body, bg=SURFACE, width=200)
+        sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
 
+        mk_label(sidebar, "  APPS", fg=TEXT_DIM, font=FONT_BADGE,
+                 bg=SURFACE).pack(anchor="w", pady=(16, 6))
+
         self._nav_btns: dict[str, tk.Button] = {}
-        for app in [
+        apps = [
             "Global", "Figma", "Adobe Photoshop", "Blender",
             "Visual Studio Code", "Google Slides", "Notion", "Slack", "OBS Studio"
-        ]:
+        ]
+        for app in apps:
             b = tk.Button(
-                sidebar, text=app, command=lambda a=app: self._show_page(a),
-                bg=SURFACE, fg=TEXT, font=FONT_BTN, relief="flat",
-                anchor="w", padx=12, pady=6, cursor="hand2",
-                bd=0, highlightthickness=0,
+                sidebar, text=f"  {app}",
+                command=lambda a=app: self._show_page(a),
+                bg=SURFACE, fg=TEXT_MED, font=FONT_NAV,
+                relief="flat", anchor="w",
+                padx=4, pady=7,
+                cursor="hand2", bd=0,
+                highlightthickness=0,
+                activebackground=SURFACE2,
+                activeforeground=TEXT,
             )
-            b.pack(fill="x", pady=1)
+            b.pack(fill="x")
             self._nav_btns[app] = b
 
+            # hover effect
+            def _enter(e, btn=b):
+                if btn.cget("bg") != ACCENT_DIM:
+                    btn.config(bg=SURFACE2, fg=TEXT)
+
+            def _leave(e, btn=b):
+                if btn.cget("bg") != ACCENT_DIM:
+                    btn.config(bg=SURFACE, fg=TEXT_MED)
+
+            b.bind("<Enter>", _enter)
+            b.bind("<Leave>", _leave)
+
+        # right separator
+        tk.Frame(body, bg=BORDER, width=1).pack(side="left", fill="y")
+
+        # scrollable content
         content_outer = tk.Frame(body, bg=BG)
-        content_outer.pack(side="left", fill="both", expand=True, padx=10)
+        content_outer.pack(side="left", fill="both", expand=True)
 
         self.canvas = tk.Canvas(content_outer, bg=BG, highlightthickness=0)
-        sb = ttk.Scrollbar(content_outer, orient="vertical", command=self.canvas.yview)
+        sb = ttk.Scrollbar(content_outer, orient="vertical",
+                           command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
         self.canvas.pack(side="left", fill="both", expand=True)
 
         self.content_frame = tk.Frame(self.canvas, bg=BG)
-        self._cwin = self.canvas.create_window((0, 0), window=self.content_frame, anchor="nw")
+        self._cwin = self.canvas.create_window(
+            (0, 0), window=self.content_frame, anchor="nw")
 
-        self.content_frame.bind("<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        self.canvas.bind("<Configure>",
+        self.content_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all")))
+        self.canvas.bind(
+            "<Configure>",
             lambda e: self.canvas.itemconfig(self._cwin, width=e.width))
 
+    # ── NAVIGATION ────────────────────────────────────────────────────────────
     def _show_page(self, app_name):
         self.current_page = app_name
         for name, btn in self._nav_btns.items():
-            btn.config(
-                bg=ACCENT_DIM if name == app_name else SURFACE,
-                fg=BG         if name == app_name else TEXT)
+            if name == app_name:
+                btn.config(bg=ACCENT_DIM, fg=TEXT)
+            else:
+                btn.config(bg=SURFACE, fg=TEXT_MED)
         self._render_page(app_name)
 
+    # ── RENDER ────────────────────────────────────────────────────────────────
     def _render_page(self, app_name):
         for w in self.content_frame.winfo_children():
             w.destroy()
@@ -265,68 +392,104 @@ class GesturePuckApp:
         self._label_vars.clear()
         self._entries.clear()
 
-        tk.Label(self.content_frame, text=f"{app_name}  —  Gesture Mappings",
-                 bg=BG, fg=ACCENT, font=FONT_TITLE).pack(anchor="w", padx=10,
-                 pady=(16, 8))
+        # page header
+        header = tk.Frame(self.content_frame, bg=BG)
+        header.pack(fill="x", padx=24, pady=(20, 4))
 
+        tk.Label(header, text=app_name, bg=BG, fg=ACCENT,
+                 font=("Courier New", 16, "bold")).pack(side="left")
+        tk.Label(header, text="  ·  Gesture Mappings", bg=BG,
+                 fg=TEXT_DIM, font=FONT_LABEL).pack(side="left")
+
+        mk_separator(self.content_frame, BORDER).pack(
+            fill="x", padx=24, pady=(8, 0))
+
+        # column headers
         hdr = tk.Frame(self.content_frame, bg=BG)
-        hdr.pack(fill="x", padx=10, pady=(0, 4))
-        for text, w in [("GESTURE", 14), ("LABEL", 20), ("MACRO", 20), ("ACTIONS", 22)]:
-            tk.Label(hdr, text=text, bg=BG, fg=TEXT_DIM, font=FONT_LABEL,
-                     width=w, anchor="w").pack(side="left")
+        hdr.pack(fill="x", padx=24, pady=(6, 2))
+        for col, w in [("GESTURE", 18), ("LABEL", 22), ("MACRO / SHORTCUT", 26)]:
+            tk.Label(hdr, text=col, bg=BG, fg=TEXT_DIM,
+                     font=FONT_BADGE, width=w, anchor="w").pack(side="left")
+        tk.Label(hdr, text="ACTIONS", bg=BG, fg=TEXT_DIM,
+                 font=FONT_BADGE).pack(side="left")
 
-        tk.Frame(self.content_frame, bg=BORDER, height=1).pack(fill="x", padx=10, pady=2)
+        mk_separator(self.content_frame, BORDER).pack(
+            fill="x", padx=24, pady=(2, 4))
 
-        for gesture, data in self.mappings.get(app_name, {}).items():
-            self._add_row(gesture, data.get("label", gesture), data.get("macro", ""))
+        rows = self.mappings.get(app_name, {})
+        if not rows:
+            tk.Label(self.content_frame,
+                     text="No gestures yet. Click + ADD GESTURE to create one.",
+                     bg=BG, fg=TEXT_DIM, font=FONT_LABEL).pack(
+                         anchor="w", padx=24, pady=12)
+        else:
+            for i, (gesture, data) in enumerate(rows.items()):
+                self._add_row(gesture,
+                              data.get("label", gesture),
+                              data.get("macro", ""),
+                              alt=(i % 2 == 1))
 
-        tk.Frame(self.content_frame, bg=BORDER, height=1).pack(fill="x", padx=10, pady=8)
+        mk_separator(self.content_frame, BORDER).pack(
+            fill="x", padx=24, pady=(8, 0))
+
         mk_btn(self.content_frame, "+ ADD GESTURE",
                lambda: self._add_new_gesture(app_name),
-               bg=BORDER, fg=ACCENT).pack(anchor="w", padx=10, pady=4)
+               bg=SURFACE2, fg=ACCENT).pack(anchor="w", padx=24, pady=12)
 
-    def _add_row(self, gesture, label, macro):
-        row = tk.Frame(self.content_frame, bg=SURFACE)
-        row.pack(fill="x", padx=10, pady=2)
+    def _add_row(self, gesture, label, macro, alt=False):
+        row_bg = SURFACE2 if alt else SURFACE
+        row = tk.Frame(self.content_frame, bg=row_bg)
+        row.pack(fill="x", padx=24, pady=1)
 
-        tk.Label(row, text=gesture, bg=SURFACE, fg=ACCENT,
-                 font=FONT_MONO, width=14, anchor="w").pack(side="left", padx=(8, 4))
+        # gesture name badge
+        badge = tk.Label(row, text=gesture, bg=ACCENT_DIM, fg=TEXT,
+                         font=FONT_BADGE, padx=6, pady=2, width=16, anchor="w")
+        badge.pack(side="left", padx=(8, 12), pady=6)
 
+        # label entry
         lvar = tk.StringVar(value=label)
         self._label_vars[gesture] = lvar
-        tk.Entry(row, textvariable=lvar, bg=BG, fg=TEXT,
-                 insertbackground=ACCENT, relief="flat", width=20,
-                 font=FONT_MONO).pack(side="left", padx=4)
+        label_entry = tk.Entry(
+            row, textvariable=lvar, bg=BG, fg=TEXT,
+            insertbackground=ACCENT, relief="flat",
+            width=20, font=FONT_MONO,
+            highlightthickness=1,
+            highlightbackground=BORDER,
+            highlightcolor=ACCENT,
+        )
+        label_entry.pack(side="left", padx=(0, 8), ipady=3)
 
+        # macro entry
         mvar = tk.StringVar(value=macro)
         self._macro_vars[gesture] = mvar
-        entry = tk.Entry(row, textvariable=mvar, bg=BG, fg=YELLOW,
-                         insertbackground=ACCENT, relief="flat", width=20,
-                         font=FONT_MONO)
-        entry.pack(side="left", padx=4)
+        entry = tk.Entry(
+            row, textvariable=mvar, bg=BG, fg=MACRO_CLR,
+            insertbackground=ACCENT, relief="flat",
+            width=22, font=FONT_MONO,
+            highlightthickness=1,
+            highlightbackground=BORDER,
+            highlightcolor=ACCENT,
+        )
+        entry.pack(side="left", padx=(0, 12), ipady=3)
         self._entries[gesture] = entry
 
-        mk_btn(row, "REC",
+        # action buttons
+        mk_btn(row, "⏺  REC",
                lambda g=gesture: self._start_record(g),
-               bg=BORDER, fg=YELLOW).pack(side="left", padx=2)
-        mk_btn(row, "SAVE",
-               lambda g=gesture, mv=mvar, lv=lvar: self._save(g, mv.get(), lv.get()),
-               ).pack(side="left", padx=2)
+               bg=SURFACE, fg=REC_CLR).pack(side="left", padx=(0, 4))
+
+        mk_btn(row, "✓  SAVE",
+               lambda g=gesture, mv=mvar, lv=lvar: self._save(
+                   g, mv.get(), lv.get()),
+               bg=SURFACE, fg=SAVE_CLR).pack(side="left", padx=(0, 4))
+
         mk_btn(row, "✕",
                lambda g=gesture: self._delete(g),
-               bg=BORDER, fg=RED).pack(side="left", padx=(2, 8))
+               bg=SURFACE, fg=DEL_CLR).pack(side="left", padx=(0, 8))
 
-    def _add_new_gesture(self, app_name):
-        existing = self.mappings.get(app_name, {})
-        i, name = len(existing) + 1, ""
-        while not name or name in existing:
-            name = f"Gesture {i}"; i += 1
-        self.mappings.setdefault(app_name, {})[name] = {"label": name, "macro": ""}
-        store.save(self.mappings)
-        self._render_page(app_name)
-
+    # ── DEVICE / CONNECT ──────────────────────────────────────────────────────
     def _scan_devices(self):
-        self.status.set("SCANNING...")
+        self._set_status("SCANNING…", TEXT_DIM)
         def task():
             devs = bluetooth_spp.list_devices()
             self.root.after(0, lambda: self._update_devices(devs))
@@ -337,53 +500,58 @@ class GesturePuckApp:
         names = [n for _, n in devices]
         self.combo["values"] = names
         if names:
-            self.combo.current(0); self.status.set("DEVICES FOUND")
+            self.combo.current(0)
+            self._set_status("DEVICES FOUND", TEXT_MED)
         else:
-            self.status.set("NO DEVICES")
+            self._set_status("NO DEVICES", TEXT_DIM)
 
     def _connect(self):
         name = self.device_var.get()
         addr = next((a for a, n in self.devices if n == name), None)
         if not addr:
-            messagebox.showerror("Error", "Select a valid device"); return
+            messagebox.showerror("Error", "Select a valid device")
+            return
         def task():
             self.connection = bluetooth_spp.connect(addr, self._on_event)
-            self.root.after(0, lambda: self.status.set("CONNECTED"))
+            self.root.after(0, lambda: self._set_status("CONNECTED", ACCENT))
         threading.Thread(target=task, daemon=True).start()
 
-    from engine.active_app import get_mapped_app  # add to imports at top
+    def _set_status(self, text, color):
+        self.status.set(text)
+        self._status_lbl.config(fg=color)
+        dot_color = ACCENT if color == ACCENT else (
+            REC_CLR if color == REC_CLR else TEXT_DIM)
+        self._status_dot.delete("all")
+        self._status_dot.create_oval(0, 0, 8, 8, fill=dot_color, outline="")
+
+    # ── EVENTS ────────────────────────────────────────────────────────────────
+    from engine.active_app import get_mapped_app
 
     def _on_event(self, msg):
-        print(f"[DEBUG] received: {repr(msg)}")  # remove once working
-    
+        print(f"[DEBUG] received: {repr(msg)}")
         if "_DOWN" in msg:
             gesture = msg.replace("_DOWN", "").strip()
             self.root.after(0, lambda: self.last_gesture.set(gesture))
-
             active_app = get_mapped_app()
             print(f"[DEBUG] active app: {active_app}, gesture: {gesture}")
-
-        # Try app-specific first, fall back to Global
             macro = (
                 self.mappings.get(active_app, {}).get(gesture, {}).get("macro")
                 or
                 self.mappings.get("Global", {}).get(gesture, {}).get("macro")
             )
             print(f"[DEBUG] macro found: {repr(macro)}")
-
             if macro:
                 macro_runner.run_macro(macro)
             else:
                 self.root.after(0, lambda: self._ask_map(gesture))
 
-
+    # ── RECORDING ─────────────────────────────────────────────────────────────
     def _start_record(self, gesture):
-        # If another row is currently armed, repaint its entry back to normal.
         for tok, prev_g in list(self._pending.items()):
             prev_entry = self._entries.get(prev_g)
             prev_mvar  = self._macro_vars.get(prev_g)
             if prev_entry and prev_mvar:
-                prev_entry.config(fg=YELLOW)
+                prev_entry.config(fg=MACRO_CLR)
                 if prev_mvar.get() == "recording…":
                     prev_mvar.set("")
             self._pending.pop(tok, None)
@@ -397,8 +565,7 @@ class GesturePuckApp:
         mvar  = self._macro_vars[gesture]
         entry = self._entries[gesture]
         mvar.set("recording…")
-        entry.config(fg=RED)
-
+        entry.config(fg=REC_CLR)
         self.recorder.arm(token)
 
     def _poll_recorder(self):
@@ -413,34 +580,46 @@ class GesturePuckApp:
                 if mvar is None or entry is None:
                     continue
                 mvar.set(chord)
-                entry.config(fg=YELLOW)
+                entry.config(fg=MACRO_CLR)
         except queue.Empty:
             pass
         self.root.after(50, self._poll_recorder)
 
+    # ── CRUD ──────────────────────────────────────────────────────────────────
     def _save(self, gesture, macro, label):
         self.mappings.setdefault(self.current_page, {})[gesture] = {
             "label": label, "macro": macro}
         store.save(self.mappings)
 
     def _delete(self, gesture):
-        if messagebox.askyesno("Delete", f"Delete '{gesture}'?"):
+        if messagebox.askyesno("Delete", f"Delete mapping for '{gesture}'?"):
             self.mappings.get(self.current_page, {}).pop(gesture, None)
             store.save(self.mappings)
             self._render_page(self.current_page)
 
     def _ask_map(self, gesture):
-        if not messagebox.askyesno("New Gesture",
-                                   f"'{gesture}' has no mapping. Add one?"):
+        if not messagebox.askyesno(
+                "New Gesture",
+                f"'{gesture}' has no mapping.\nAdd one for this app?"):
             return
         self.mappings.setdefault(self.current_page, {})[gesture] = {
             "label": gesture, "macro": ""}
         store.save(self.mappings)
         self._render_page(self.current_page)
 
+    def _add_new_gesture(self, app_name):
+        existing = self.mappings.get(app_name, {})
+        i, name = len(existing) + 1, ""
+        while not name or name in existing:
+            name = f"Gesture {i}"; i += 1
+        self.mappings.setdefault(app_name, {})[name] = {
+            "label": name, "macro": ""}
+        store.save(self.mappings)
+        self._render_page(app_name)
 
+
+# ── ENTRY POINT ────────────────────────────────────────────────────────────────
 def main():
-    # Seed a default page so a fresh run shows something to test against.
     if not store.load():
         store.save({"Global": {"Tap": {"label": "Tap", "macro": ""}}})
     root = tk.Tk()

@@ -2,6 +2,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPExcept
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import Depends
 import uvicorn
 import requests
 import asyncio
@@ -14,10 +15,11 @@ import hashlib
 from urllib.parse import urlencode
 import httpx
 import uuid
+import mysql.connector
 
-OIDC_CLIENT_ID = '735598754969-kj3er85glenphh738msfhlb39bj3391m.apps.googleusercontent.com'
-OIDC_CLIENT_SECRET = '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'
-OIDC_REDIRECT_URI = "http://localhost:5500/callback"
+OIDC_CLIENT_ID = os.environ["OIDC_CLIENT_ID"]
+OIDC_CLIENT_SECRET = os.environ["OIDC_CLIENT_SECRET"]
+OIDC_REDIRECT_URI = os.environ.get("OIDC_REDIRECT_URI", "http://localhost:5500/callback")
 
 OIDC_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 OIDC_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -36,6 +38,30 @@ app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse(request, "index.html")
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings(request: Request):
+    return templates.TemplateResponse(request, "settings.html")
+
+@app.get("/team", response_class=HTMLResponse)
+def settings(request: Request):
+    return templates.TemplateResponse(request, "team.html")
+
+@app.get("/careers", response_class=HTMLResponse)
+def settings(request: Request):
+    return templates.TemplateResponse(request, "careers.html")
+
+def get_db():
+    conn = mysql.connector.connect(
+        host=os.environ["DB_HOST"],
+        user=os.environ["DB_USER"],
+        password=os.environ["DB_PASSWORD"],
+        database=os.environ["DB_NAME"],
+    )
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 @app.get("/login")
 def login():
@@ -59,7 +85,7 @@ def login():
     return RedirectResponse(f"{OIDC_AUTHORIZE_URL}?{params}")
 
 @app.get("/callback")
-def callback(code: str, state: str, request: Request):  #conn=Depends(get_db)
+def callback(code: str, state: str, request: Request, conn=Depends(get_db)):
     code_verifier = pkce_store.pop(state, None)
     if not code_verifier:
         raise HTTPException(status_code=400, detail="Invalid state parameter")
@@ -94,8 +120,24 @@ def callback(code: str, state: str, request: Request):  #conn=Depends(get_db)
     sub = userinfo["sub"]
     username = userinfo.get("name", sub)
     email = userinfo.get("email", "")
+    picture = userinfo.get("picture", "")
 
     # Upsert user: create if new, update if existing
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT id FROM users WHERE sub = %s", (sub,))
+    existing = cursor.fetchone()
+    if existing:
+        user_id = existing["id"]
+        cursor.execute(
+            "UPDATE users SET username = %s, email = %s WHERE id = %s",
+            (username, email, user_id),
+        )
+    else:
+        cursor.execute(
+            "INSERT INTO users (sub, username, email) VALUES (%s, %s, %s)",
+            (sub, username, email),
+        )
+        user_id = cursor.lastrowid
     
     
     # Create session
@@ -103,7 +145,7 @@ def callback(code: str, state: str, request: Request):  #conn=Depends(get_db)
     users[sub] = userinfo
     sessions[session_token] = sub
 
-    response = templates.TemplateResponse(request, "gestures.html", {"username": username})
+    response = templates.TemplateResponse(request, "gestures.html", {"username": username, "picture": picture})
     response.set_cookie(key="session_token", value=session_token, httponly=True)
     return response
 

@@ -1,0 +1,36 @@
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: gesturepuck
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql  # runs on first startup
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    ports:
+      - "5500:5500"
+    environment:
+      DB_HOST: ${DB_HOST:-db}
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-rootpass}
+      DB_NAME: ${DB_NAME:-gesturepuck}
+      DB_PORT: ${DB_PORT:-3306}
+      OIDC_CLIENT_ID: 735598754969-kj3er85glenphh738msfhlb39bj3391m.apps.googleusercontent.com
+      OIDC_CLIENT_SECRET: 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
+      OIDC_REDIRECT_URI: http://localhost:5500/callback
+    depends_on:
+      db:
+        condition: service_healthy  # waits for MySQL to be ready before starting
+
+volumes:
+  mysql_data:
