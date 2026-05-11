@@ -50,7 +50,7 @@
  [],
  False,
  False,
- 1778390930,
+ 1778529112,
  [('runw',
    '/Users/ramalchunduri/Downloads/ECE140B/GesturePuck/App/.venv/lib/python3.13/site-packages/PyInstaller/bootloader/Darwin-64bit/runw',
    'EXECUTABLE')],

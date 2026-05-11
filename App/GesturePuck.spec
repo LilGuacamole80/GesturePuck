@@ -12,8 +12,6 @@ a = Analysis(
     datas=[
         *bleak_datas,
         *pynput_datas,
-        # Add any assets here if you have icons etc
-        # ('assets/icon.png', 'assets'),
     ],
     hiddenimports=[
         *bleak_hiddenimports,
@@ -27,13 +25,14 @@ a = Analysis(
         'engine.macro_runner',
         'engine.bluetooth_spp',
         'engine.active_app',
+        'engine.controller',  # added
         'ui.tkinter_ui',
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        'mappings.json',  # never bundle this — lives in user's app data folder
+        'mappings.json',
     ],
     noarchive=False,
 )
@@ -50,7 +49,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,   # no terminal window when user runs it
+    console=False,
 )
 
 coll = COLLECT(
@@ -69,11 +68,10 @@ app = BUNDLE(
     # icon='assets/icon.icns',  # uncomment when you have an icon
     bundle_identifier='com.gesturepuck.app',
     info_plist={
-        # Allows BLE to work on macOS — required
         'NSBluetoothAlwaysUsageDescription': 'GesturePuck needs Bluetooth to connect to your device.',
         'NSBluetoothPeripheralUsageDescription': 'GesturePuck needs Bluetooth to connect to your device.',
-        # Allows reading active window title via AppleScript
         'NSAppleEventsUsageDescription': 'GesturePuck needs this to detect which app is active.',
-        'LSUIElement': True,  # hides from dock when running in background
+        'NSAccessibilityUsageDescription': 'GesturePuck needs Accessibility access to simulate key presses.',
+        'LSUIElement': False,  # show in dock so macOS permission prompts work correctly
     },
 )

@@ -4,6 +4,10 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from pynput import keyboard as pynput_kb
 from engine.active_app import get_mapped_app
+import subprocess
+import sys
+import ctypes
+from engine.active_app import get_mapped_app
 
 try:
     import engine.mappings as store
@@ -137,6 +141,35 @@ def mk_separator(parent, color=BORDER):
 def mk_label(parent, text, fg=TEXT_DIM, font=FONT_LABEL, bg=BG, **kw):
     return tk.Label(parent, text=text, bg=bg, fg=fg, font=font, **kw)
 
+
+
+def check_macos_permissions():
+    """Checks and prompts for required macOS permissions on first launch"""
+    if sys.platform != "darwin":
+        return
+    
+    # Check if we have accessibility access
+    result = subprocess.run(
+        ["osascript", "-e", 
+         'tell application "System Events" to get name of first process'],
+        capture_output=True
+    )
+    
+    if result.returncode != 0:
+        # No accessibility permission — show instructions
+        import tkinter.messagebox as mb
+        mb.showwarning(
+            "Permission Required",
+            "GesturePuck needs Accessibility permission to simulate key presses.\n\n"
+            "Please go to:\n"
+            "System Settings → Privacy & Security → Accessibility\n\n"
+            "Enable GesturePuck, then restart the app."
+        )
+        # Open the right settings page automatically
+        subprocess.run([
+            "open", 
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        ])
 
 # ── KEY RECORDER ───────────────────────────────────────────────────────────────
 class GlobalKeyRecorder:
@@ -525,7 +558,6 @@ class GesturePuckApp:
         self._status_dot.create_oval(0, 0, 8, 8, fill=dot_color, outline="")
 
     # ── EVENTS ────────────────────────────────────────────────────────────────
-    from engine.active_app import get_mapped_app
 
     def _on_event(self, msg):
         print(f"[DEBUG] received: {repr(msg)}")

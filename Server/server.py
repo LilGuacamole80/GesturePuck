@@ -19,7 +19,7 @@ import mysql.connector
 
 OIDC_CLIENT_ID = os.environ["OIDC_CLIENT_ID"]
 OIDC_CLIENT_SECRET = os.environ["OIDC_CLIENT_SECRET"]
-OIDC_REDIRECT_URI = os.environ.get("OIDC_REDIRECT_URI", "http://localhost:5500/callback")
+OIDC_REDIRECT_URI = os.environ.get("OIDC_REDIRECT_URI")
 
 OIDC_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 OIDC_TOKEN_URL = "https://oauth2.googleapis.com/token"
