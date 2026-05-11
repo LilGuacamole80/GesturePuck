@@ -27,7 +27,7 @@ services:
       DB_PORT: ${DB_PORT:-3306}
       OIDC_CLIENT_ID: 735598754969-kj3er85glenphh738msfhlb39bj3391m.apps.googleusercontent.com
       OIDC_CLIENT_SECRET: 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
-      OIDC_REDIRECT_URI: http://localhost:5500/callback
+      OIDC_REDIRECT_URI: https://gesturepuck.onrender.com/callback
     depends_on:
       db:
         condition: service_healthy  # waits for MySQL to be ready before starting
