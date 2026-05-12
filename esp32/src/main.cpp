@@ -1,99 +1,100 @@
 #include <Arduino.h>
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
+#include <Wire.h>
+#include "DFRobot_MatrixLidar.h"
 
-// Nordic UART Service (NUS) — standard BLE serial protocol
-#define SERVICE_UUID "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
-#define CHARACTERISTIC_TX "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"  
+// SEN0628 / DFRobot Matrix LiDAR
+// Address 0x30 means A1 = 0 and A0 = 0, with the I2C switch enabled.
+DFRobot_MatrixLidar_I2C tof(0x30);
 
-BLEServer* pServer = nullptr;
-BLECharacteristic* pTX = nullptr;
-bool connected = false;
+uint16_t frame[64];
 
-const int BUTTON_PINS[] = {13, 33};
-const char* BUTTON_EVENTS[] = {"Gesture 1", "Gesture 2"};
-const int BUTTON_COUNT = 2;
+// Binary frame format:
+//   "MLD1" magic, uint32 seq, uint32 millis, uint32 read_us, 64 little-endian uint16 distances, uint16 checksum
+// The checksum is the 16-bit sum of all bytes before the checksum field.
+const uint8_t FRAME_MAGIC[4] = {'M', 'L', 'D', '1'};
+const uint32_t SERIAL_BAUD = 921600;
 
-const unsigned long DEBOUNCE_MS = 40;
+// 50 FPS target. If readings become unstable, raise this to 33 or 50 ms.
+const uint32_t FRAME_PERIOD_MS = 20;
+uint32_t nextFrameMs = 0;
+uint32_t seq = 0;
 
-bool stableStates[BUTTON_COUNT];
-bool lastReadings[BUTTON_COUNT];
-unsigned long lastChangeTimes[BUTTON_COUNT];
+void putU16LE(uint8_t* buf, size_t &pos, uint16_t value) {
+  buf[pos++] = value & 0xff;
+  buf[pos++] = (value >> 8) & 0xff;
+}
 
-class ServerCallbacks : public BLEServerCallbacks {
-    void onConnect(BLEServer* s) override {
-        connected = true;
-        Serial.println("BLE client connected");
-    }
-    void onDisconnect(BLEServer* s) override {
-        connected = false;
-        Serial.println("BLE client disconnected — restarting advertising");
-        BLEDevice::startAdvertising();   // auto-reconnect
-    }
-};
+void putU32LE(uint8_t* buf, size_t &pos, uint32_t value) {
+  buf[pos++] = value & 0xff;
+  buf[pos++] = (value >> 8) & 0xff;
+  buf[pos++] = (value >> 16) & 0xff;
+  buf[pos++] = (value >> 24) & 0xff;
+}
 
-void sendEvent(const char* event) {
-    Serial.println(event);
-    if (connected) {
-        pTX->setValue((uint8_t*)event, strlen(event));
-        pTX->notify();
-    }
+void writeBinaryFrame(uint32_t frameSeq, uint32_t frameMs, uint32_t readUs) {
+  uint8_t packet[4 + 4 + 4 + 4 + 64 * 2 + 2];
+  size_t pos = 0;
+
+  for (uint8_t b : FRAME_MAGIC) {
+    packet[pos++] = b;
+  }
+  putU32LE(packet, pos, frameSeq);
+  putU32LE(packet, pos, frameMs);
+  putU32LE(packet, pos, readUs);
+  for (uint8_t i = 0; i < 64; i++) {
+    putU16LE(packet, pos, frame[i]);
+  }
+
+  uint16_t checksum = 0;
+  for (size_t i = 0; i < pos; i++) {
+    checksum += packet[i];
+  }
+  putU16LE(packet, pos, checksum);
+
+  Serial.write(packet, pos);
 }
 
 void setup() {
-    Serial.begin(115200);
+  // This is the ESP32-to-computer USB serial rate, not the LiDAR's I2C rate.
+  Serial.begin(SERIAL_BAUD);
+  delay(1500);
 
-    for (int i = 0; i < BUTTON_COUNT; i++) {
-        pinMode(BUTTON_PINS[i], INPUT_PULLUP);
-        stableStates[i] = HIGH;
-        lastReadings[i] = HIGH;
-        lastChangeTimes[i] = 0;
-    }
+  Wire.begin();
+  // Fast-mode I2C. If your wiring is long/noisy and begin fails, change to 100000 or remove this line.
+  Wire.setClock(400000);
 
-    BLEDevice::init("GesturePuck");
-    pServer = BLEDevice::createServer();
-    pServer->setCallbacks(new ServerCallbacks());
+  Serial.println("# Matrix LiDAR binary stream starting");
+  Serial.println("# Packet format: MLD1,seq,millis,read_us,64xuint16,checksum16");
+  Serial.println("# Address: 0x30");
 
-    BLEService* pService = pServer->createService(SERVICE_UUID);
+  while (tof.begin() != 0) {
+    Serial.println("# LiDAR begin error. Check wiring, 3V/GND, I2C switch, and address 0x30.");
+    delay(1000);
+  }
+  Serial.println("# LiDAR connected");
 
-    pTX = pService->createCharacteristic(
-        CHARACTERISTIC_TX,
-        BLECharacteristic::PROPERTY_NOTIFY
-    );
-    pTX->addDescriptor(new BLE2902());
-
-    pService->start();
-
-    BLEAdvertising* pAdv = BLEDevice::getAdvertising();
-    pAdv->addServiceUUID(SERVICE_UUID);
-    pAdv->setScanResponse(true);
-    BLEDevice::startAdvertising();
-
-    Serial.println("GesturePuck ready — BLE advertising");
+  while (tof.setRangingMode(eMatrix_8X8) != 0) {
+    Serial.println("# Failed to set 8x8 mode");
+    delay(1000);
+  }
+  Serial.println("# 8x8 mode active");
 }
 
 void loop() {
-    unsigned long now = millis();
+  uint32_t now = millis();
+  if ((int32_t)(now - nextFrameMs) < 0) {
+    return;
+  }
+  nextFrameMs = now + FRAME_PERIOD_MS;
 
-    for (int i = 0; i < BUTTON_COUNT; i++) {
-        bool reading = digitalRead(BUTTON_PINS[i]);
+  uint32_t readStartUs = micros();
+  uint8_t err = tof.getAllData(frame);
+  uint32_t readUs = micros() - readStartUs;
+  uint32_t frameSeq = seq++;
+  if (err != 0) {
+    Serial.println("# getAllData error");
+    return;
+  }
 
-        if (reading != lastReadings[i]) {
-            lastReadings[i] = reading;
-            lastChangeTimes[i] = now;
-        }
-
-        if ((now - lastChangeTimes[i]) > DEBOUNCE_MS) {
-            if (reading != stableStates[i]) {
-                stableStates[i] = reading;
-                char event[32];
-                snprintf(event, sizeof(event), "%s_%s",
-                         BUTTON_EVENTS[i],
-                         reading == LOW ? "DOWN" : "UP");
-                sendEvent(event);
-            }
-        }
-    }
+  writeBinaryFrame(frameSeq, now, readUs);
 }
