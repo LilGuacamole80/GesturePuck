@@ -88,6 +88,9 @@ LABEL_KEYS = {
     "7": "hold_center",
 }
 
+# APDS-9930 hand-detection threshold (must match HAND_THRESHOLD in main.cpp)
+HAND_THRESHOLD = 500
+
 # ---------------------------------------------------------------------------
 # Macro mapping
 # ---------------------------------------------------------------------------
@@ -119,6 +122,28 @@ class FramePacket:
     device_ms: Optional[int] = None
     read_us: Optional[int] = None
     protocol: str = "csv"
+
+
+@dataclass
+class DualFramePacket:
+    """Carries frames from both ToF sensors plus APDS proximity reading."""
+    host_t: float
+    tof1: np.ndarray                    # 8x8 float mm — primary (used for gesture pipeline)
+    tof2: np.ndarray                    # 8x8 float mm — companion view
+    proximity: int = 0                  # APDS-9930 raw proximity value
+    hand_present: bool = False          # True when proximity > HAND_THRESHOLD
+    seq: Optional[int] = None
+    device_ms: Optional[int] = None
+
+    def to_frame_packet(self) -> FramePacket:
+        """Convert to single-sensor FramePacket (ToF #1) for the gesture pipeline."""
+        return FramePacket(
+            host_t=self.host_t,
+            values=self.tof1.copy(),
+            seq=self.seq,
+            device_ms=self.device_ms,
+            protocol="dual-tof",
+        )
 
 
 @dataclass
@@ -552,8 +577,233 @@ class DemoFrameSource:
         pass
 
 # ---------------------------------------------------------------------------
-# Preprocessing and segmentation
+# Dual-sensor serial source  (GesturePuck firmware with APDS-9930 + 2x ToF)
 # ---------------------------------------------------------------------------
+
+# The firmware sends:
+#   MLD1 packets  — ToF #1 binary frames (same format as original single-sensor firmware)
+#   MLD2 packets  — ToF #2 binary frames (same format, different magic)
+#   #PROX,<val>,<0|1>\n  — APDS-9930 proximity line (~4 Hz)
+#
+# Packet layout for both MLD1 and MLD2 (146 bytes total):
+#   4  bytes  magic ("MLD1" or "MLD2")
+#   4  bytes  seq        uint32 LE
+#   4  bytes  millis     uint32 LE
+#   4  bytes  read_us    uint32 LE
+#   128 bytes 64×uint16  pixel distances LE
+#   2  bytes  checksum   uint16 LE (sum of all preceding bytes & 0xFFFF)
+
+BINARY_MAGIC2 = b"MLD2"   # ToF #2 magic; BINARY_MAGIC (MLD1) already defined above
+
+class DualSensorSerialFrameSource:
+    """
+    Reads the mixed binary + ASCII stream from the GesturePuck dual-sensor firmware.
+
+    MLD1 binary packets → ToF #1 (gesture pipeline primary)
+    MLD2 binary packets → ToF #2 (companion heatmap)
+    #PROX text lines    → APDS-9930 proximity / hand-present flag
+
+    A DualFramePacket is emitted each time a matching ToF #1 + ToF #2 pair
+    arrives with the same sequence number.  If the sequence numbers differ by
+    more than one (e.g. a sensor read failed) the most recent frame from each
+    sensor is used so the display never stalls.
+    """
+
+    def __init__(self, port: str, baud: int = 921600):
+        try:
+            import serial  # type: ignore
+        except ImportError as exc:
+            raise SystemExit(
+                "pyserial is not installed. Run:\n"
+                "  pip install pyserial"
+            ) from exc
+        self.ser = serial.Serial(port, baud, timeout=0.05)
+        self.q: "queue.Queue[DualFramePacket]" = queue.Queue(maxsize=5)
+        self.stop_event = threading.Event()
+        self.thread = threading.Thread(target=self._read_loop, daemon=True)
+        self.buf = bytearray()
+
+        # Latest parsed frames from each sensor (held until a pair can be emitted)
+        self._pending1: Optional[FramePacket] = None
+        self._pending2: Optional[FramePacket] = None
+
+        # Latest APDS state
+        self._proximity: int = 0
+        self._hand_present: bool = False
+
+        # Stats
+        self.frames_seen = 0
+        self.tof1_frames = 0
+        self.tof2_frames = 0
+        self.checksum_errors = 0
+        self.serial_errors = 0
+        self.bad_lines = 0
+        self.last_error = ""
+
+    def start(self) -> None:
+        time.sleep(1.0)
+        self.thread.start()
+
+    def _read_loop(self) -> None:
+        while not self.stop_event.is_set():
+            try:
+                waiting = self.ser.in_waiting
+                raw = self.ser.read(waiting or 1)
+            except Exception as exc:
+                self.serial_errors += 1
+                self.last_error = str(exc)
+                time.sleep(0.05)
+                continue
+            if not raw:
+                continue
+            self.buf.extend(raw)
+            self._drain()
+
+    def _drain(self) -> None:
+        """
+        Drain the byte buffer, handling interleaved binary packets and ASCII lines.
+
+        Binary packets start with MLD1 or MLD2.
+        ASCII lines start with '#' and end with '\\n'.
+        Everything else is discarded.
+        """
+        while self.buf:
+            magic1_at = self.buf.find(BINARY_MAGIC)
+            magic2_at = self.buf.find(BINARY_MAGIC2)
+            newline_at = self.buf.find(b"\n")
+
+            # Find nearest interesting position
+            candidates = [p for p in (magic1_at, magic2_at, newline_at) if p != -1]
+            if not candidates:
+                # Nothing useful yet; keep up to 3 bytes in case a magic is split
+                if len(self.buf) > BINARY_PACKET_SIZE:
+                    keep = len(BINARY_MAGIC) - 1
+                    del self.buf[:-keep]
+                return
+
+            nearest = min(candidates)
+
+            # Discard bytes before the nearest interesting position
+            if nearest > 0:
+                del self.buf[:nearest]
+                continue
+
+            # Handle binary packet (MLD1 or MLD2)
+            if magic1_at == 0 or magic2_at == 0:
+                if len(self.buf) < BINARY_PACKET_SIZE:
+                    return   # wait for more bytes
+                raw_pkt = bytes(self.buf[:BINARY_PACKET_SIZE])
+                # Verify checksum
+                expected = struct.unpack_from("<H", raw_pkt, BINARY_PACKET_SIZE - 2)[0]
+                actual = sum(raw_pkt[:-2]) & 0xFFFF
+                if actual != expected:
+                    self.checksum_errors += 1
+                    del self.buf[0]   # skip one byte and retry
+                    continue
+                del self.buf[:BINARY_PACKET_SIZE]
+                self._handle_binary(raw_pkt)
+                continue
+
+            # Handle ASCII line
+            if newline_at == 0:
+                end = self.buf.find(b"\n")
+                if end == -1:
+                    return
+                raw_line = bytes(self.buf[:end + 1])
+                del self.buf[:end + 1]
+                line = raw_line.decode("utf-8", errors="ignore").strip()
+                if line.startswith("#PROX,"):
+                    self._handle_prox_line(line)
+                # All other '#' lines are comments — silently ignored
+                continue
+
+    def _handle_binary(self, raw: bytes) -> None:
+        magic = raw[:4]
+        seq, device_ms, read_us = struct.unpack_from("<III", raw, 4)
+        values = np.array(
+            struct.unpack_from("<" + "H" * N_PIXELS, raw, 16),
+            dtype=float,
+        ).reshape((GRID, GRID))
+        pkt = FramePacket(
+            host_t=time.time(),
+            values=values,
+            seq=seq,
+            device_ms=device_ms,
+            read_us=read_us,
+            protocol="bin",
+        )
+        if magic == BINARY_MAGIC:
+            self._pending1 = pkt
+            self.tof1_frames += 1
+        else:
+            self._pending2 = pkt
+            self.tof2_frames += 1
+        self._try_emit()
+
+    def _handle_prox_line(self, line: str) -> None:
+        # Format: #PROX,<proximity>,<0|1>
+        try:
+            parts = line.split(",")
+            self._proximity = int(parts[1])
+            self._hand_present = int(parts[2]) == 1
+        except (IndexError, ValueError):
+            self.bad_lines += 1
+
+    def _try_emit(self) -> None:
+        """Emit a DualFramePacket when we have a frame from each sensor."""
+        if self._pending1 is None or self._pending2 is None:
+            return
+        p1 = self._pending1
+        p2 = self._pending2
+        self._pending1 = None
+        self._pending2 = None
+
+        dual = DualFramePacket(
+            host_t=p1.host_t,
+            tof1=p1.values,
+            tof2=p2.values,
+            proximity=self._proximity,
+            hand_present=self._hand_present,
+            seq=p1.seq,
+            device_ms=p1.device_ms,
+        )
+        self.frames_seen += 1
+        if self.q.full():
+            try:
+                self.q.get_nowait()
+            except queue.Empty:
+                pass
+        try:
+            self.q.put_nowait(dual)
+        except queue.Full:
+            pass
+
+    def read_latest(self) -> Optional[DualFramePacket]:
+        latest = None
+        while True:
+            try:
+                latest = self.q.get_nowait()
+            except queue.Empty:
+                break
+        return latest
+
+    def stats(self) -> str:
+        return (
+            f"dual frames={self.frames_seen} "
+            f"tof1={self.tof1_frames} tof2={self.tof2_frames} "
+            f"csum_err={self.checksum_errors} serial_err={self.serial_errors}"
+        )
+
+    def close(self) -> None:
+        self.stop_event.set()
+        try:
+            self.thread.join(timeout=0.5)
+        except Exception:
+            pass
+        try:
+            self.ser.close()
+        except Exception:
+            pass
 
 class SignalPipeline:
     def __init__(self, args: argparse.Namespace):
@@ -1639,9 +1889,23 @@ class Visualizer:
         self.z_history: Deque[Tuple[float, float, float, float]] = deque(maxlen=args.history_len)
         self.fps_times: Deque[float] = deque(maxlen=90)
 
-        self.fig = plt.figure(figsize=(16, 9))
+        # Track the latest ToF #2 frame for display (only available in dual-sensor mode)
+        self._latest_tof2: Optional[np.ndarray] = None
+        self._latest_proximity: int = 0
+        self._latest_hand_present: bool = False
+        self._dual_mode: bool = isinstance(source, DualSensorSerialFrameSource)
+
+        # ---- figure layout ----
+        # Dual-sensor mode: wider figure with an extra column for ToF #2 + APDS status.
+        # Single-sensor mode: original 3-column layout.
+        if self._dual_mode:
+            self.fig = plt.figure(figsize=(20, 9))
+            gs = self.fig.add_gridspec(3, 4, height_ratios=[1.0, 1.0, 0.85])
+        else:
+            self.fig = plt.figure(figsize=(16, 9))
+            gs = self.fig.add_gridspec(3, 3, height_ratios=[1.0, 1.0, 0.85])
+
         self.fig.canvas.mpl_connect("key_press_event", self.on_key)
-        gs = self.fig.add_gridspec(3, 3, height_ratios=[1.0, 1.0, 0.85])
 
         self.ax_raw = self.fig.add_subplot(gs[0, 0])
         self.ax_fg = self.fig.add_subplot(gs[0, 1])
@@ -1650,35 +1914,91 @@ class Visualizer:
         self.ax_depth = self.fig.add_subplot(gs[1, 1])
         self.ax_scores = self.fig.add_subplot(gs[1, 2])
         self.ax_features = self.fig.add_subplot(gs[2, 0])
-        self.ax_events = self.fig.add_subplot(gs[2, 1:])
+
+        if self._dual_mode:
+            # Extra column: ToF #2 heatmap (top) + APDS status (middle) + events (bottom span)
+            self.ax_tof2 = self.fig.add_subplot(gs[0, 3])
+            self.ax_apds = self.fig.add_subplot(gs[1, 3])
+            self.ax_events = self.fig.add_subplot(gs[2, 1:])
+        else:
+            self.ax_tof2 = None
+            self.ax_apds = None
+            self.ax_events = self.fig.add_subplot(gs[2, 1:])
+
         self.ax_events.axis("off")
 
+        # ---- axes setup ----
         init = np.full((GRID, GRID), float(args.max_mm))
         self.raw_img = self.ax_raw.imshow(init, vmin=args.min_mm, vmax=args.max_mm, origin="upper")
-        self.ax_raw.set_title("Raw distance / mm")
+        self.ax_raw.set_title("ToF #1 — Raw distance / mm")
         self.ax_raw.set_xlabel("X")
         self.ax_raw.set_ylabel("Y")
         self.fig.colorbar(self.raw_img, ax=self.ax_raw, fraction=0.046, pad=0.04)
 
         self.fg_img = self.ax_fg.imshow(np.zeros((GRID, GRID)), vmin=0, vmax=1, origin="upper")
-        self.ax_fg.set_title("Foreground likelihood")
+        self.ax_fg.set_title("ToF #1 — Foreground likelihood")
         self.ax_fg.set_xlabel("X")
         self.ax_fg.set_ylabel("Y")
         self.fg_centroid, = self.ax_fg.plot([], [], marker="o", markersize=8)
         self.fig.colorbar(self.fg_img, ax=self.ax_fg, fraction=0.046, pad=0.04)
 
         self.comp_img = self.ax_component.imshow(np.zeros((GRID, GRID)), vmin=0, vmax=1, origin="upper")
-        self.ax_component.set_title("Selected hand blob")
+        self.ax_component.set_title("ToF #1 — Selected hand blob")
         self.ax_component.set_xlabel("X")
         self.ax_component.set_ylabel("Y")
         self.comp_centroid, = self.ax_component.plot([], [], marker="o", markersize=8)
 
+        # Pixel-value text overlays for ToF #1 raw heatmap
         self.value_texts: List[List[object]] = []
         for y in range(GRID):
             row = []
             for x in range(GRID):
                 row.append(self.ax_raw.text(x, y, "", ha="center", va="center", fontsize=7))
             self.value_texts.append(row)
+
+        # ---- ToF #2 companion heatmap (dual mode only) ----
+        if self._dual_mode and self.ax_tof2 is not None:
+            self.tof2_img = self.ax_tof2.imshow(init, vmin=args.min_mm, vmax=args.max_mm, origin="upper")
+            self.ax_tof2.set_title("ToF #2 — Raw distance / mm")
+            self.ax_tof2.set_xlabel("X")
+            self.ax_tof2.set_ylabel("Y")
+            self.fig.colorbar(self.tof2_img, ax=self.ax_tof2, fraction=0.046, pad=0.04)
+            # Pixel-value overlays for ToF #2
+            self.tof2_value_texts: List[List[object]] = []
+            for y in range(GRID):
+                row2 = []
+                for x in range(GRID):
+                    row2.append(self.ax_tof2.text(x, y, "", ha="center", va="center", fontsize=7))
+                self.tof2_value_texts.append(row2)
+        else:
+            self.tof2_img = None
+            self.tof2_value_texts = []
+
+        # ---- APDS-9930 proximity panel (dual mode only) ----
+        if self._dual_mode and self.ax_apds is not None:
+            self.ax_apds.set_xlim(0, 1)
+            self.ax_apds.set_ylim(0, 1)
+            self.ax_apds.axis("off")
+            self.ax_apds.set_title("APDS-9930 Proximity")
+            self._apds_bg_rect = plt.Rectangle(
+                (0.05, 0.05), 0.90, 0.90, color="grey", transform=self.ax_apds.transAxes,
+                clip_on=False, zorder=0,
+            )
+            self.ax_apds.add_patch(self._apds_bg_rect)
+            self._apds_text = self.ax_apds.text(
+                0.5, 0.6, "No Hand", ha="center", va="center",
+                fontsize=18, fontweight="bold", color="white",
+                transform=self.ax_apds.transAxes,
+            )
+            self._apds_prox_text = self.ax_apds.text(
+                0.5, 0.3, "proximity: 0", ha="center", va="center",
+                fontsize=11, color="white",
+                transform=self.ax_apds.transAxes,
+            )
+        else:
+            self._apds_bg_rect = None
+            self._apds_text = None
+            self._apds_prox_text = None
 
         self.trail_line, = self.ax_trail.plot([], [], marker="o", markersize=3)
         self.current_point, = self.ax_trail.plot([], [], marker="o", markersize=9)
@@ -1687,7 +2007,7 @@ class Visualizer:
         self.ax_trail.set_xlabel("X")
         self.ax_trail.set_ylabel("Y")
         self.ax_trail.grid(True)
-        self.ax_trail.set_title("Smoothed centroid trail")
+        self.ax_trail.set_title("Smoothed centroid trail (ToF #1)")
 
         self.z_line, = self.ax_depth.plot([], [], label="weighted z")
         self.nearest_line, = self.ax_depth.plot([], [], label="nearest")
@@ -1696,7 +2016,7 @@ class Visualizer:
         self.ax_depth.set_ylim(args.min_mm, args.max_mm)
         self.ax_depth.set_xlabel("seconds ago")
         self.ax_depth.set_ylabel("mm")
-        self.ax_depth.set_title("Depth + quality history")
+        self.ax_depth.set_title("Depth + quality history (ToF #1)")
         self.ax_depth.legend(loc="upper left", fontsize=8)
 
         self.score_bars = self.ax_scores.barh(GESTURE_NAMES, [0.0] * len(GESTURE_NAMES))
@@ -1709,7 +2029,10 @@ class Visualizer:
         self.ax_features.axis("off")
         self.event_text = self.ax_events.text(0.0, 1.0, "", ha="left", va="top", family="monospace", transform=self.ax_events.transAxes)
 
-        self.fig.suptitle("LiDAR Gesture Studio v2")
+        title = "LiDAR Gesture Studio v2"
+        if self._dual_mode:
+            title += " — Dual Sensor (ToF #1 gesture | ToF #2 companion)"
+        self.fig.suptitle(title)
 
     def on_key(self, event) -> None:
         k = str(event.key)
@@ -1742,10 +2065,20 @@ class Visualizer:
         if self.paused:
             self._update_status()
             return []
-        packet = self.source.read_latest()
-        if packet is None:
+        raw_packet = self.source.read_latest()
+        if raw_packet is None:
             self._update_status()
             return []
+
+        # Handle dual-sensor packets: extract ToF #2 data before processing ToF #1
+        if isinstance(raw_packet, DualFramePacket):
+            self._latest_tof2 = raw_packet.tof2
+            self._latest_proximity = raw_packet.proximity
+            self._latest_hand_present = raw_packet.hand_present
+            packet = raw_packet.to_frame_packet()
+        else:
+            packet = raw_packet
+
         m = self.pipeline.process(packet)
         self.last_measurement = m
         self.fps_times.append(m.t)
@@ -1768,6 +2101,8 @@ class Visualizer:
             self.z_history.append((m.t, math.nan, math.nan, 0.0))
 
         self._update_images(m)
+        self._update_tof2()
+        self._update_apds()
         self._update_trail()
         self._update_depth()
         self._update_scores()
@@ -1792,6 +2127,40 @@ class Visualizer:
             for y in range(GRID):
                 for x in range(GRID):
                     self.value_texts[y][x].set_text("")
+
+    def _update_tof2(self) -> None:
+        """Refresh the ToF #2 companion heatmap (dual-sensor mode only)."""
+        if not self._dual_mode or self.tof2_img is None:
+            return
+        if self._latest_tof2 is None:
+            return
+        data = np.clip(self._latest_tof2, self.args.min_mm, self.args.max_mm)
+        self.tof2_img.set_data(data)
+        if self.args.show_values and self.tof2_value_texts:
+            for y in range(GRID):
+                for x in range(GRID):
+                    self.tof2_value_texts[y][x].set_text(str(int(data[y, x])))
+        else:
+            for y in range(GRID):
+                for x in range(GRID):
+                    if self.tof2_value_texts:
+                        self.tof2_value_texts[y][x].set_text("")
+
+    def _update_apds(self) -> None:
+        """Refresh the APDS-9930 proximity status panel (dual-sensor mode only)."""
+        if not self._dual_mode or self._apds_bg_rect is None:
+            return
+        if self._latest_hand_present:
+            color = "#2ecc71"   # green
+            label = "✋ Hand Present"
+        else:
+            color = "#e74c3c"   # red
+            label = "No Hand"
+        self._apds_bg_rect.set_facecolor(color)
+        if self._apds_text is not None:
+            self._apds_text.set_text(label)
+        if self._apds_prox_text is not None:
+            self._apds_prox_text.set_text(f"proximity: {self._latest_proximity}")
 
     def _update_trail(self) -> None:
         if not self.trail:
@@ -1872,6 +2241,10 @@ class Visualizer:
         active_text = "none" if active is None else f"{len(active.samples)} samples, {active.duration:.2f}s"
         pending = self.recorder.pending_label or "none"
         cooldown = max(0.0, self.detector.cooldown_until - time.time())
+        dual_line = ""
+        if self._dual_mode:
+            hand_str = "YES" if self._latest_hand_present else "no"
+            dual_line = f"APDS-9930:     hand={hand_str}  proximity={self._latest_proximity}\n"
         feature_lines = (
             f"{meas}\n"
             f"active stroke: {active_text}\n"
@@ -1879,6 +2252,7 @@ class Visualizer:
             f"fps:           {self._fps():.1f}\n"
             f"macros:        {'ENABLED' if self.macros.enabled else 'disabled'}\n"
             f"record next:   {pending}\n"
+            f"{dual_line}"
             f"source:        {self.source.stats()}\n\n"
             f"features:\n"
             f"  dx={f['dx']:+.2f}  dy={f['dy']:+.2f}  dz={f['dz']:+.0f}mm\n"
@@ -1915,6 +2289,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
     src.add_argument("--port", default=None, help="Serial port, e.g. /dev/cu.usbmodem2101")
     src.add_argument("--baud", type=int, default=921600, help="ESP32 USB serial baud; match Serial.begin")
     src.add_argument("--demo", action="store_true", help="Run without hardware using fake gesture data")
+    src.add_argument(
+        "--dual", action="store_true",
+        help=(
+            "Use dual-sensor mode: parse APDS-9930 + two ToF sensors from the ESP32 "
+            "debug text format (main.cpp with APDS + tof1 + tof2). "
+            "Automatically sets --baud 115200 unless overridden. "
+            "ToF #1 feeds the gesture pipeline; ToF #2 is shown as a companion heatmap."
+        ),
+    )
 
     display = p.add_argument_group("display")
     display.add_argument("--min-mm", type=int, default=20)
@@ -2020,10 +2403,14 @@ def main() -> int:
     args = build_arg_parser().parse_args()
     if not args.demo and not args.port:
         raise SystemExit("Provide --port /dev/cu.usbmodem2101, or use --demo")
+
     if args.demo:
         if args.calibration_frames == 60:
             args.calibration_frames = 0
         source = DemoFrameSource(max_mm=args.max_mm)
+    elif args.dual:
+        # Dual-sensor mode: same 921600 baud as single-sensor, binary MLD1/MLD2 + #PROX lines.
+        source = DualSensorSerialFrameSource(args.port, args.baud)
     else:
         source = SerialFrameSource(args.port, args.baud)
 
@@ -2036,7 +2423,11 @@ def main() -> int:
 
     source.start()
     print("LiDAR Gesture Studio v2 started.")
-    print("Close PlatformIO Serial Monitor before using this script.")
+    if args.dual:
+        print("Dual-sensor mode: APDS-9930 proximity + ToF #1 (gesture) + ToF #2 (companion).")
+        print("Ensure the dual-sensor main.cpp firmware is running on the ESP32.")
+    else:
+        print("Close PlatformIO Serial Monitor before using this script.")
     print("Keep your hand out of view during calibration, then perform gestures inside the 8x8 grid.")
     print("Press r in the window to recalibrate. Use --flip-x / --flip-y if directions are mirrored.")
     if diag_logger.enabled and diag_logger.path is not None:
