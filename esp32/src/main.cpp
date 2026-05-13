@@ -25,6 +25,15 @@
 #define HAND_THRESHOLD 500
 
 
+// Compact serial stream for the desktop visualizer.
+// Keep this at 115200 so PlatformIO Serial Monitor and the app use the same baud.
+const uint32_t SERIAL_BAUD = 115200;
+const uint32_t FRAME_PERIOD_MS = 50;      // 20 Hz target; actual rate is limited by sensor read time
+const uint32_t STATUS_PERIOD_MS = 1000;   // throttle non-frame diagnostic messages
+const uint8_t LED_BRIGHTNESS = 8;         // keep USB power draw low during bring-up
+const bool STREAM_TOF2 = false;           // one-sensor bring-up path; enable later if power is solid
+
+
 DFRobot_MatrixLidar_I2C tof1(TOF1_ADDR);
 DFRobot_MatrixLidar_I2C tof2(TOF2_ADDR);
 
@@ -42,8 +51,9 @@ bool tof2OK = false;
 bool apdsOK = false;
 
 
-const uint32_t FRAME_PERIOD_MS = 250;
 uint32_t lastPrintMs = 0;
+uint32_t lastStatusMs = 0;
+uint32_t frameSeq = 0;
 
 
 void setRingColor(CRGB color) {
@@ -83,6 +93,36 @@ void print8x8(uint16_t frame[64]) {
     }
     Serial.println();
   }
+}
+
+
+void printProximity(uint16_t proximity, bool handPresent) {
+  Serial.print("#PROX,");
+  Serial.print(proximity);
+  Serial.print(",");
+  Serial.println(handPresent ? 1 : 0);
+}
+
+
+void printFrameCSV(const char *prefix, uint32_t seq, uint32_t deviceMs, uint16_t frame[64]) {
+  Serial.print(prefix);
+  Serial.print(",");
+  Serial.print(seq);
+  Serial.print(",");
+  Serial.print(deviceMs);
+  for (int i = 0; i < 64; i++) {
+    Serial.print(",");
+    Serial.print(frame[i]);
+  }
+  Serial.println();
+}
+
+
+void printStatusThrottled(const char *message) {
+  uint32_t now = millis();
+  if (now - lastStatusMs < STATUS_PERIOD_MS) return;
+  lastStatusMs = now;
+  Serial.println(message);
 }
 
 
@@ -135,13 +175,13 @@ bool setupAPDS9930() {
 
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
   delay(1500);
 
 
   // LED setup
   FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
-  FastLED.setBrightness(40);
+  FastLED.setBrightness(LED_BRIGHTNESS);
   setRingColor(CRGB::Red);
 
 
@@ -179,9 +219,6 @@ void loop() {
   lastPrintMs = millis();
 
 
-  Serial.println("\n\n======================================");
-
-
   bool handPresent = false;
   uint16_t proximity = 0;
 
@@ -189,29 +226,23 @@ void loop() {
   // Read APDS first
   if (apdsOK) {
     if (apds.readProximity(proximity)) {
-      Serial.print("APDS-9930 proximity: ");
-      Serial.println(proximity);
-
-
       if (proximity > HAND_THRESHOLD) {
         handPresent = true;
-        Serial.println("Hand present: YES");
         setRingColor(CRGB::Green);
       } else {
-        Serial.println("Hand present: NO");
         setRingColor(CRGB::Red);
       }
     } else {
-      Serial.println("APDS-9930 read failed.");
+      printStatusThrottled("#ERR,APDS,read_failed");
       setRingColor(CRGB::Blue);
     }
   } else {
-    Serial.println("APDS-9930 skipped.");
+    printStatusThrottled("#ERR,APDS,init_failed");
     setRingColor(CRGB::Blue);
   }
 
 
-  delay(50);
+  printProximity(proximity, handPresent);
 
 
   // Only read ToF if hand is present
@@ -221,26 +252,26 @@ void loop() {
 
 
       if (err1 == 0) {
-        Serial.println("\nToF #1 frame:");
-        print8x8(frame1);
+        printFrameCSV("FRAME", frameSeq, millis(), frame1);
       } else {
-        Serial.println("ToF #1 read error.");
+        printStatusThrottled("#ERR,TOF1,read_failed");
       }
+    } else {
+      printStatusThrottled("#ERR,TOF1,init_failed");
     }
 
 
-    if (tof2OK) {
+    if (STREAM_TOF2 && tof2OK) {
       uint8_t err2 = tof2.getAllData(frame2);
 
 
       if (err2 == 0) {
-        Serial.println("\nToF #2 frame:");
-        print8x8(frame2);
+        printFrameCSV("FRAME2", frameSeq, millis(), frame2);
       } else {
-        Serial.println("ToF #2 read error.");
+        printStatusThrottled("#ERR,TOF2,read_failed");
       }
     }
-  } else {
-    Serial.println("Skipping ToF read because no hand detected.");
   }
+
+  frameSeq++;
 }

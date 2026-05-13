@@ -21,8 +21,7 @@ The script focuses on reliability rather than just a flashy demo:
   - optional macro execution through pyautogui
 
 Run:
-    source lidar-venv/bin/activate
-    python3 lidar_gesture_studio.py --port /dev/cu.usbmodem2101 --max-mm 2000 --show-values
+    uv run python lidar_gesture_studio.py --port /dev/cu.usbserial-0001 --dual --max-mm 2000
 
 Useful keys while the plot window is focused:
     r   recalibrate background; keep hand out of view
@@ -59,7 +58,7 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Deque, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Deque, Dict, Iterable, List, Optional, Sequence, TextIO, Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -69,6 +68,7 @@ GRID = 8
 N_PIXELS = GRID * GRID
 BINARY_MAGIC = b"MLD1"
 BINARY_PACKET_SIZE = len(BINARY_MAGIC) + 4 + 4 + 4 + N_PIXELS * 2 + 2
+TEXT_LINE_BUFFER_LIMIT = 4096
 GESTURE_NAMES = [
     "swipe_left",
     "swipe_right",
@@ -134,15 +134,17 @@ class DualFramePacket:
     hand_present: bool = False          # True when proximity > HAND_THRESHOLD
     seq: Optional[int] = None
     device_ms: Optional[int] = None
+    primary_sensor: int = 1
 
     def to_frame_packet(self) -> FramePacket:
-        """Convert to single-sensor FramePacket (ToF #1) for the gesture pipeline."""
+        """Convert to single-sensor FramePacket for the gesture pipeline."""
+        protocol = "dual-tof" if self.primary_sensor == 1 else "dual-tof2-fallback"
         return FramePacket(
             host_t=self.host_t,
             values=self.tof1.copy(),
             seq=self.seq,
             device_ms=self.device_ms,
-            protocol="dual-tof",
+            protocol=protocol,
         )
 
 
@@ -291,6 +293,19 @@ def serializable_args(args: argparse.Namespace) -> Dict[str, object]:
     return out
 
 
+def resolve_serial_debug_path(value: Optional[str]) -> Optional[Path]:
+    if value is None:
+        return None
+    if value.lower() == "auto":
+        stamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
+        return Path("logs") / f"serial_debug_{stamp}.log"
+    path = Path(value).expanduser()
+    if path.exists() and path.is_dir():
+        stamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
+        return path / f"serial_debug_{stamp}.log"
+    return path
+
+
 def apply_orientation(frame: np.ndarray, *, flip_x: bool, flip_y: bool, transpose: bool) -> np.ndarray:
     out = frame
     if transpose:
@@ -369,12 +384,81 @@ def parse_binary_packet(packet: bytes) -> Optional[FramePacket]:
         protocol="bin",
     )
 
+
+class SerialDebugLogger:
+    """Small thread-safe logger for serial bytes and parser decisions."""
+
+    def __init__(
+        self,
+        *,
+        enabled: bool = False,
+        path: Optional[Path] = None,
+        log_reads: bool = False,
+        max_preview: int = 180,
+    ):
+        self.enabled = enabled or path is not None
+        self.path = path
+        self.log_reads = log_reads
+        self.max_preview = max(20, max_preview)
+        self._lock = threading.Lock()
+        self._fh: Optional[TextIO] = None
+        if self.path is not None:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self._fh = self.path.open("a", encoding="utf-8")
+
+    def _timestamp(self) -> str:
+        now = time.time()
+        base = time.strftime("%H:%M:%S", time.localtime(now))
+        return f"{base}.{int((now % 1.0) * 1000):03d}"
+
+    def _preview_bytes(self, raw: bytes) -> str:
+        sample = raw[: self.max_preview]
+        text = sample.decode("utf-8", errors="replace")
+        text = text.replace("\r", "\\r").replace("\n", "\\n")
+        suffix = f" (+{len(raw) - len(sample)} bytes)" if len(raw) > len(sample) else ""
+        return f"{len(raw)} bytes ascii={text!r}{suffix}"
+
+    def log(self, event: str, message: str) -> None:
+        if not self.enabled:
+            return
+        line = f"[{self._timestamp()}] {event}: {message}"
+        with self._lock:
+            print(line, file=sys.stderr, flush=True)
+            if self._fh is not None:
+                self._fh.write(line + "\n")
+                self._fh.flush()
+
+    def raw_read(self, raw: bytes) -> None:
+        if self.enabled and self.log_reads:
+            self.log("rx", self._preview_bytes(raw))
+
+    def raw_line(self, raw: bytes) -> None:
+        if self.enabled:
+            self.log("line", self._preview_bytes(raw.rstrip(b"\r\n")))
+
+    def close(self) -> None:
+        with self._lock:
+            if self._fh is not None:
+                self._fh.close()
+                self._fh = None
+
+
+def frame_stats(values: np.ndarray) -> str:
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return "no finite pixels"
+    return (
+        f"finite={finite.size}/{values.size} "
+        f"min={float(np.min(finite)):.0f} max={float(np.max(finite)):.0f} "
+        f"mean={float(np.mean(finite)):.0f}"
+    )
+
 # ---------------------------------------------------------------------------
 # Data sources
 # ---------------------------------------------------------------------------
 
 class SerialFrameSource:
-    def __init__(self, port: str, baud: int):
+    def __init__(self, port: str, baud: int, serial_debug: Optional[SerialDebugLogger] = None):
         try:
             import serial  # type: ignore
         except ImportError as exc:
@@ -383,6 +467,9 @@ class SerialFrameSource:
                 "  source lidar-venv/bin/activate\n"
                 "  python3 -m pip install pyserial"
             ) from exc
+        self.port = port
+        self.baud = baud
+        self.serial_debug = serial_debug or SerialDebugLogger()
         self.ser = serial.Serial(port, baud, timeout=0.05)
         self.q: "queue.Queue[FramePacket]" = queue.Queue(maxsize=5)
         self.stop_event = threading.Event()
@@ -400,9 +487,16 @@ class SerialFrameSource:
         self.last_seq: Optional[int] = None
         self.dropped_seq = 0
         self.read_us_history: Deque[int] = deque(maxlen=120)
+        self.last_event = "opened serial port"
+
+    def _note(self, event: str, message: str, *, remember: bool = True) -> None:
+        if remember:
+            self.last_event = f"{event}: {message}"[:90]
+        self.serial_debug.log(event, message)
 
     def start(self) -> None:
         time.sleep(1.0)
+        self._note("serial", f"starting reader for {self.port} at {self.baud} baud")
         self.thread.start()
 
     def _read_loop(self) -> None:
@@ -418,6 +512,7 @@ class SerialFrameSource:
             if not raw:
                 continue
             self.bytes_seen += len(raw)
+            self.serial_debug.raw_read(raw)
             self.buf.extend(raw)
             self._drain_buffer()
 
@@ -427,9 +522,11 @@ class SerialFrameSource:
             newline_at = self.buf.find(b"\n")
 
             if magic_at == -1 and newline_at == -1:
-                if len(self.buf) > BINARY_PACKET_SIZE:
+                if len(self.buf) > TEXT_LINE_BUFFER_LIMIT:
                     self.bad_lines += 1
                     keep = max(0, len(BINARY_MAGIC) - 1)
+                    dropped_count = len(self.buf) - keep
+                    self._note("drain", f"dropped {dropped_count} bytes from oversized unterminated text/binary buffer")
                     del self.buf[:-keep]
                 return
 
@@ -443,10 +540,12 @@ class SerialFrameSource:
                 packet = parse_binary_packet(raw_packet)
                 if packet is None:
                     self.checksum_errors += 1
+                    self._note("binary", "MLD1 checksum/packet parse failed; skipping one byte")
                     del self.buf[0]
                     continue
                 del self.buf[:BINARY_PACKET_SIZE]
                 self.binary_frames += 1
+                self._note("binary", f"MLD1 frame seq={packet.seq} {frame_stats(packet.values)}")
                 self._handle_packet(packet)
                 continue
 
@@ -463,13 +562,16 @@ class SerialFrameSource:
 
     def _handle_line(self, raw: bytes) -> None:
         self.lines_seen += 1
+        self.serial_debug.raw_line(raw)
         line = raw.decode("utf-8", errors="ignore")
         packet = parse_frame_line(line)
         if packet is None:
             if line.strip() and not line.startswith("#"):
                 self.bad_lines += 1
+                self._note("text", f"ignored non-FRAME line: {line.strip()[:100]!r}")
             return
         self.csv_frames += 1
+        self._note("text", f"FRAME csv parsed seq={packet.seq} {frame_stats(packet.values)}")
         self._handle_packet(packet)
 
     def _handle_packet(self, packet: FramePacket) -> None:
@@ -481,6 +583,7 @@ class SerialFrameSource:
             self.read_us_history.append(packet.read_us)
 
         self.frames_seen += 1
+        self._note("emit", f"queued frame #{self.frames_seen} protocol={packet.protocol} seq={packet.seq}")
         if self.q.full():
             try:
                 self.q.get_nowait()
@@ -507,10 +610,11 @@ class SerialFrameSource:
         else:
             read_part = ""
         err_part = f" serial_err={self.serial_errors}" if self.serial_errors else ""
+        last_part = f" last={self.last_event}" if self.last_event else ""
         return (
-            f"serial frames={self.frames_seen} bin={self.binary_frames} csv={self.csv_frames} "
+            f"serial bytes={self.bytes_seen} frames={self.frames_seen} bin={self.binary_frames} csv={self.csv_frames} "
             f"bad={self.bad_lines} csum={self.checksum_errors} seq_drop={self.dropped_seq}"
-            f"{read_part}{err_part}"
+            f"{read_part}{err_part}{last_part}"
         )
 
     def close(self) -> None:
@@ -523,6 +627,7 @@ class SerialFrameSource:
             self.ser.close()
         except Exception:
             pass
+        self.serial_debug.close()
 
 
 class DemoFrameSource:
@@ -583,7 +688,9 @@ class DemoFrameSource:
 # The preferred firmware stream sends:
 #   MLD1 packets  — ToF #1 binary frames (same format as original single-sensor firmware)
 #   MLD2 packets  — ToF #2 binary frames (same format, different magic)
-#   #PROX,<val>,<0|1>\n  — APDS-9930 proximity line (~4 Hz)
+#   FRAME,seq,millis,64 values — compact ToF #1 CSV frames
+#   FRAME2,seq,millis,64 values — compact ToF #2 CSV frames
+#   #PROX,<val>,<0|1>\n  — APDS-9930 proximity line
 #
 # The current bring-up sketch also prints human-readable debug text:
 #   APDS-9930 proximity: <val>
@@ -610,6 +717,7 @@ class DualSensorSerialFrameSource:
     MLD1 binary packets → ToF #1 (gesture pipeline primary)
     MLD2 binary packets → ToF #2 (companion heatmap)
     #PROX text lines    → APDS-9930 proximity / hand-present flag
+    FRAME CSV lines     → compact one-sensor bring-up stream
     debug text tables   → fallback parser for the serial-monitor bring-up sketch
 
     A DualFramePacket is emitted each time a matching ToF #1 + ToF #2 pair
@@ -618,7 +726,12 @@ class DualSensorSerialFrameSource:
     sensor is used so the display never stalls.
     """
 
-    def __init__(self, port: str, baud: int = 115200):
+    def __init__(
+        self,
+        port: str,
+        baud: int = 115200,
+        serial_debug: Optional[SerialDebugLogger] = None,
+    ):
         try:
             import serial  # type: ignore
         except ImportError as exc:
@@ -626,13 +739,17 @@ class DualSensorSerialFrameSource:
                 "pyserial is not installed. Run:\n"
                 "  pip install pyserial"
             ) from exc
+        self.port = port
+        self.baud = baud
+        self.serial_debug = serial_debug or SerialDebugLogger()
         self.ser = serial.Serial(port, baud, timeout=0.05)
         self.q: "queue.Queue[DualFramePacket]" = queue.Queue(maxsize=5)
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self._read_loop, daemon=True)
         self.buf = bytearray()
 
-        # Latest parsed frames from each sensor (held until a pair can be emitted)
+        # Latest parsed frames from each sensor. The visualizer can run with one
+        # sensor; the second sensor is a companion view when available.
         self._pending1: Optional[FramePacket] = None
         self._pending2: Optional[FramePacket] = None
 
@@ -646,17 +763,30 @@ class DualSensorSerialFrameSource:
 
         # Stats
         self.frames_seen = 0
+        self.bytes_seen = 0
+        self.raw_reads = 0
+        self.discarded_bytes = 0
         self.tof1_frames = 0
         self.tof2_frames = 0
+        self.single_sensor_frames = 0
+        self.prox_lines = 0
+        self.hand_lines = 0
         self.text_lines = 0
         self.text_frames = 0
         self.checksum_errors = 0
         self.serial_errors = 0
         self.bad_lines = 0
         self.last_error = ""
+        self.last_event = "opened serial port"
+
+    def _note(self, event: str, message: str, *, remember: bool = True) -> None:
+        if remember:
+            self.last_event = f"{event}: {message}"[:90]
+        self.serial_debug.log(event, message)
 
     def start(self) -> None:
         time.sleep(1.0)
+        self._note("serial", f"starting dual reader for {self.port} at {self.baud} baud")
         self.thread.start()
 
     def _read_loop(self) -> None:
@@ -671,6 +801,9 @@ class DualSensorSerialFrameSource:
                 continue
             if not raw:
                 continue
+            self.bytes_seen += len(raw)
+            self.raw_reads += 1
+            self.serial_debug.raw_read(raw)
             self.buf.extend(raw)
             self._drain()
 
@@ -698,6 +831,11 @@ class DualSensorSerialFrameSource:
                 actual = sum(raw_pkt[:-2]) & 0xFFFF
                 if actual != expected:
                     self.checksum_errors += 1
+                    self._note(
+                        "binary",
+                        f"{raw_pkt[:4].decode('ascii', errors='replace')} checksum mismatch "
+                        f"expected={expected} actual={actual}; skipping one byte",
+                    )
                     del self.buf[0]   # skip one byte and retry
                     continue
                 del self.buf[:BINARY_PACKET_SIZE]
@@ -713,13 +851,20 @@ class DualSensorSerialFrameSource:
             if nearest_magic > 0:
                 # Text or noise before a binary packet without a complete newline.
                 # Drop it so the next loop can parse the packet at buffer start.
+                dropped = bytes(self.buf[:nearest_magic])
+                self.discarded_bytes += len(dropped)
+                self._note("drain", f"dropped {len(dropped)} bytes before binary magic")
                 del self.buf[:nearest_magic]
                 continue
 
             if newline_at == -1:
-                # Nothing useful yet; keep up to 3 bytes in case a magic is split
-                if len(self.buf) > BINARY_PACKET_SIZE:
+                # Wait for the rest of an ASCII line. CSV FRAME lines are longer
+                # than binary packets, so do not trim at BINARY_PACKET_SIZE here.
+                if len(self.buf) > TEXT_LINE_BUFFER_LIMIT:
                     keep = len(BINARY_MAGIC) - 1
+                    dropped_count = len(self.buf) - keep
+                    self.discarded_bytes += dropped_count
+                    self._note("drain", f"dropped {dropped_count} bytes from oversized unterminated text/binary buffer")
                     del self.buf[:-keep]
                 return
 
@@ -741,10 +886,14 @@ class DualSensorSerialFrameSource:
         if magic == BINARY_MAGIC:
             self._pending1 = pkt
             self.tof1_frames += 1
+            self._note("binary", f"MLD1 seq={seq} read_us={read_us} {frame_stats(values)}")
+            self._try_emit(primary_sensor=1)
         else:
             self._pending2 = pkt
             self.tof2_frames += 1
-        self._try_emit()
+            self._note("binary", f"MLD2 seq={seq} read_us={read_us} {frame_stats(values)}")
+            if self._pending1 is None:
+                self._try_emit(primary_sensor=2)
 
     def _handle_prox_line(self, line: str) -> None:
         # Format: #PROX,<proximity>,<0|1>
@@ -752,12 +901,16 @@ class DualSensorSerialFrameSource:
             parts = line.split(",")
             self._proximity = int(parts[1])
             self._hand_present = int(parts[2]) == 1
+            self.prox_lines += 1
+            self._note("apds", f"#PROX proximity={self._proximity} hand={self._hand_present}")
         except (IndexError, ValueError):
             self.bad_lines += 1
+            self._note("bad-line", f"invalid #PROX line: {line[:120]!r}")
 
     def _handle_text_line(self, raw: bytes) -> None:
         """Handle #PROX lines and the current Serial Monitor debug table format."""
         self.text_lines += 1
+        self.serial_debug.raw_line(raw)
         line = raw.decode("utf-8", errors="ignore").strip()
         if not line:
             return
@@ -766,38 +919,63 @@ class DualSensorSerialFrameSource:
             self._handle_prox_line(line)
             return
 
+        if line.startswith(("#ERR,", "#INFO,")):
+            self._note("firmware", line)
+            return
+
+        if line.startswith(("FRAME,", "FRAME1,", "FRAME2,")):
+            self._handle_csv_frame_line(line)
+            return
+
         if line.startswith("APDS-9930 proximity:"):
             try:
                 self._proximity = int(line.split(":", 1)[1].strip())
+                self.prox_lines += 1
+                self._note("apds", f"serial-monitor proximity={self._proximity}")
             except ValueError:
                 self.bad_lines += 1
+                self._note("bad-line", f"invalid APDS proximity line: {line[:120]!r}")
             return
 
         if line.startswith("Hand present:"):
             value = line.split(":", 1)[1].strip().lower()
             if value in ("yes", "1", "true"):
                 self._hand_present = True
+                self.hand_lines += 1
+                self._note("apds", "hand_present=True")
             elif value in ("no", "0", "false"):
                 self._hand_present = False
+                self.hand_lines += 1
+                self._note("apds", "hand_present=False")
             else:
                 self.bad_lines += 1
+                self._note("bad-line", f"invalid hand-present line: {line[:120]!r}")
             return
 
         if line.startswith("ToF #1 frame:"):
+            self._note("tof-header", "starting ToF #1 debug text frame")
             self._begin_debug_frame(1)
             return
 
         if line.startswith("ToF #2 frame:"):
+            self._note("tof-header", "starting ToF #2 debug text frame")
             self._begin_debug_frame(2)
             return
 
         if self._debug_frame_sensor is not None:
             row = self._parse_debug_row(line)
             if row is None:
+                sensor = self._debug_frame_sensor
                 self._cancel_debug_frame()
                 self.bad_lines += 1
+                self._note("bad-row", f"ToF #{sensor} row did not have 8 numeric values: {line[:120]!r}")
                 return
             self._debug_rows.append(row)
+            self._note(
+                "tof-row",
+                f"ToF #{self._debug_frame_sensor} row {len(self._debug_rows)}/8 "
+                f"first={row[0]:.0f} last={row[-1]:.0f}",
+            )
             if len(self._debug_rows) == GRID:
                 self._finish_debug_frame()
             return
@@ -814,7 +992,33 @@ class DualSensorSerialFrameSource:
             or line.startswith("ToF #")
             or line.startswith("Skipping ToF read")
         ):
+            self._note("text", f"ignored bring-up line: {line[:120]!r}", remember=False)
             return
+
+        self._note("text", f"unrecognized line outside a ToF table: {line[:120]!r}")
+
+    def _handle_csv_frame_line(self, line: str) -> None:
+        sensor = 2 if line.startswith("FRAME2,") else 1
+        if line.startswith(("FRAME1,", "FRAME2,")):
+            parse_line = "FRAME," + line.split(",", 1)[1]
+        else:
+            parse_line = line
+        pkt = parse_frame_line(parse_line)
+        if pkt is None:
+            self.bad_lines += 1
+            self._note("bad-line", f"invalid FRAME csv line: {line[:120]!r}")
+            return
+        pkt.protocol = f"csv-tof{sensor}"
+        if sensor == 1:
+            self._pending1 = pkt
+            self.tof1_frames += 1
+        else:
+            self._pending2 = pkt
+            self.tof2_frames += 1
+        self.text_frames += 1
+        self._note("tof-frame", f"ToF #{sensor} csv frame parsed seq={pkt.seq} {frame_stats(pkt.values)}")
+        if sensor == 1 or self._pending1 is None:
+            self._try_emit(primary_sensor=sensor)
 
     def _begin_debug_frame(self, sensor: int) -> None:
         if sensor == 1:
@@ -860,30 +1064,52 @@ class DualSensorSerialFrameSource:
             self._pending2 = pkt
             self.tof2_frames += 1
         self.text_frames += 1
+        self._note(
+            "tof-frame",
+            f"ToF #{sensor} debug text frame parsed seq={pkt.seq} {frame_stats(values)}",
+        )
         self._cancel_debug_frame()
-        self._try_emit()
+        if sensor == 1 or self._pending1 is None:
+            self._try_emit(primary_sensor=sensor)
         if sensor == 2:
             self._debug_current_seq = None
 
-    def _try_emit(self) -> None:
-        """Emit a DualFramePacket when we have a frame from each sensor."""
-        if self._pending1 is None or self._pending2 is None:
+    def _try_emit(self, primary_sensor: int = 1) -> None:
+        """Emit a DualFramePacket from the latest available ToF data."""
+        if self._pending1 is None and self._pending2 is None:
             return
-        p1 = self._pending1
-        p2 = self._pending2
-        self._pending1 = None
-        self._pending2 = None
 
+        if self._pending1 is not None:
+            primary = self._pending1
+            tof1 = self._pending1.values
+            tof2 = self._pending2.values if self._pending2 is not None else np.full_like(tof1, np.nan)
+            primary_sensor = 1
+        else:
+            primary = self._pending2
+            tof1 = self._pending2.values
+            tof2 = self._pending2.values
+            primary_sensor = 2
+
+        if self._pending1 is None or self._pending2 is None:
+            self.single_sensor_frames += 1
+
+        mode = "paired" if self._pending1 is not None and self._pending2 is not None else "single-sensor"
         dual = DualFramePacket(
-            host_t=p1.host_t,
-            tof1=p1.values,
-            tof2=p2.values,
+            host_t=primary.host_t,
+            tof1=tof1,
+            tof2=tof2,
             proximity=self._proximity,
             hand_present=self._hand_present,
-            seq=p1.seq,
-            device_ms=p1.device_ms,
+            seq=primary.seq,
+            device_ms=primary.device_ms,
+            primary_sensor=primary_sensor,
         )
         self.frames_seen += 1
+        self._note(
+            "emit",
+            f"{mode} dual packet #{self.frames_seen} primary=ToF#{primary_sensor} "
+            f"seq={primary.seq} proximity={self._proximity} hand={self._hand_present}",
+        )
         if self.q.full():
             try:
                 self.q.get_nowait()
@@ -904,11 +1130,14 @@ class DualSensorSerialFrameSource:
         return latest
 
     def stats(self) -> str:
+        last_part = f" last={self.last_event}" if self.last_event else ""
         return (
-            f"dual frames={self.frames_seen} "
+            f"dual bytes={self.bytes_seen} reads={self.raw_reads} frames={self.frames_seen} "
             f"tof1={self.tof1_frames} tof2={self.tof2_frames} "
-            f"text={self.text_frames}/{self.text_lines} "
-            f"bad={self.bad_lines} csum_err={self.checksum_errors} serial_err={self.serial_errors}"
+            f"single={self.single_sensor_frames} "
+            f"text={self.text_frames}/{self.text_lines} prox={self.prox_lines} hand={self.hand_lines} "
+            f"bad={self.bad_lines} csum_err={self.checksum_errors} "
+            f"drop_bytes={self.discarded_bytes} serial_err={self.serial_errors}{last_part}"
         )
 
     def close(self) -> None:
@@ -921,6 +1150,7 @@ class DualSensorSerialFrameSource:
             self.ser.close()
         except Exception:
             pass
+        self.serial_debug.close()
 
 class SignalPipeline:
     def __init__(self, args: argparse.Namespace):
@@ -2067,6 +2297,7 @@ class Visualizer:
 
         # Pixel-value text overlays for ToF #1 raw heatmap
         self.value_texts: List[List[object]] = []
+        self._value_text_cache = [["" for _ in range(GRID)] for _ in range(GRID)]
         for y in range(GRID):
             row = []
             for x in range(GRID):
@@ -2082,6 +2313,7 @@ class Visualizer:
             self.fig.colorbar(self.tof2_img, ax=self.ax_tof2, fraction=0.046, pad=0.04)
             # Pixel-value overlays for ToF #2
             self.tof2_value_texts: List[List[object]] = []
+            self._tof2_value_text_cache = [["" for _ in range(GRID)] for _ in range(GRID)]
             for y in range(GRID):
                 row2 = []
                 for x in range(GRID):
@@ -2090,6 +2322,7 @@ class Visualizer:
         else:
             self.tof2_img = None
             self.tof2_value_texts = []
+            self._tof2_value_text_cache = []
 
         # ---- APDS-9930 proximity panel (dual mode only) ----
         if self._dual_mode and self.ax_apds is not None:
@@ -2239,11 +2472,16 @@ class Visualizer:
         if self.args.show_values:
             for y in range(GRID):
                 for x in range(GRID):
-                    self.value_texts[y][x].set_text(str(int(m.raw[y, x])))
+                    text = str(int(m.raw[y, x]))
+                    if self._value_text_cache[y][x] != text:
+                        self.value_texts[y][x].set_text(text)
+                        self._value_text_cache[y][x] = text
         else:
             for y in range(GRID):
                 for x in range(GRID):
-                    self.value_texts[y][x].set_text("")
+                    if self._value_text_cache[y][x]:
+                        self.value_texts[y][x].set_text("")
+                        self._value_text_cache[y][x] = ""
 
     def _update_tof2(self) -> None:
         """Refresh the ToF #2 companion heatmap (dual-sensor mode only)."""
@@ -2251,17 +2489,29 @@ class Visualizer:
             return
         if self._latest_tof2 is None:
             return
-        data = np.clip(self._latest_tof2, self.args.min_mm, self.args.max_mm)
+        if not np.any(np.isfinite(self._latest_tof2)):
+            return
+        data = np.nan_to_num(
+            self._latest_tof2,
+            nan=float(self.args.max_mm),
+            posinf=float(self.args.max_mm),
+            neginf=float(self.args.min_mm),
+        )
+        data = np.clip(data, self.args.min_mm, self.args.max_mm)
         self.tof2_img.set_data(data)
         if self.args.show_values and self.tof2_value_texts:
             for y in range(GRID):
                 for x in range(GRID):
-                    self.tof2_value_texts[y][x].set_text(str(int(data[y, x])))
+                    text = str(int(data[y, x]))
+                    if self._tof2_value_text_cache[y][x] != text:
+                        self.tof2_value_texts[y][x].set_text(text)
+                        self._tof2_value_text_cache[y][x] = text
         else:
             for y in range(GRID):
                 for x in range(GRID):
-                    if self.tof2_value_texts:
+                    if self.tof2_value_texts and self._tof2_value_text_cache[y][x]:
                         self.tof2_value_texts[y][x].set_text("")
+                        self._tof2_value_text_cache[y][x] = ""
 
     def _update_apds(self) -> None:
         """Refresh the APDS-9930 proximity status panel (dual-sensor mode only)."""
@@ -2420,6 +2670,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
             "ToF #1 feeds the gesture pipeline; ToF #2 is shown as a companion heatmap."
         ),
     )
+    src.add_argument(
+        "--serial-debug",
+        action="store_true",
+        help="Print serial receive/parser debug messages to stderr.",
+    )
+    src.add_argument(
+        "--serial-debug-log",
+        default=None,
+        help="Write serial receive/parser debug messages to a file; use 'auto' for logs/serial_debug_*.log.",
+    )
+    src.add_argument(
+        "--serial-debug-bytes",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Include every raw serial read chunk in serial debug output.",
+    )
 
     display = p.add_argument_group("display")
     display.add_argument("--min-mm", type=int, default=20)
@@ -2535,14 +2801,32 @@ def main() -> int:
         args.baud = 115200 if args.dual else 921600
     if args.calibration_frames is None:
         args.calibration_frames = 0 if (args.demo or args.dual) else 60
+    if args.dual:
+        # Current GesturePuck firmware uses 4000 as the far/no-return value, and
+        # the close hand readings seen during bring-up can be below 20 mm.
+        if args.sensor_max_mm == 3500:
+            args.sensor_max_mm = 4000
+        if args.valid_min_mm == 20:
+            args.valid_min_mm = 1
+        if args.min_mm == 20:
+            args.min_mm = 0
+        if args.min_track_z_mm == 75.0:
+            args.min_track_z_mm = 1.0
+
+    serial_debug_path = resolve_serial_debug_path(args.serial_debug_log)
+    serial_debug = SerialDebugLogger(
+        enabled=args.serial_debug,
+        path=serial_debug_path,
+        log_reads=args.serial_debug_bytes,
+    )
 
     if args.demo:
         source = DemoFrameSource(max_mm=args.max_mm)
     elif args.dual:
         # Dual-sensor mode accepts both debug text at 115200 and binary MLD1/MLD2 streams.
-        source = DualSensorSerialFrameSource(args.port, args.baud)
+        source = DualSensorSerialFrameSource(args.port, args.baud, serial_debug=serial_debug)
     else:
-        source = SerialFrameSource(args.port, args.baud)
+        source = SerialFrameSource(args.port, args.baud, serial_debug=serial_debug)
 
     pipeline = SignalPipeline(args)
     detector = StrokeGestureDetector(args)
@@ -2566,6 +2850,13 @@ def main() -> int:
     print("Press r in the window to recalibrate. Use --flip-x / --flip-y if directions are mirrored.")
     if diag_logger.enabled and diag_logger.path is not None:
         print(f"Diagnostic log: {diag_logger.path}")
+    if serial_debug.enabled:
+        if serial_debug.path is not None:
+            print(f"Serial debug log: {serial_debug.path}")
+        else:
+            print("Serial debug logging: stderr")
+        if not args.serial_debug_bytes:
+            print("Use --serial-debug-bytes to also dump raw serial read chunks.")
     print()
 
     viz = Visualizer(args, source, pipeline, detector, macros, logger, diag_logger, recorder)
