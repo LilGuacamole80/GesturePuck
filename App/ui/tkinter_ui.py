@@ -10,30 +10,8 @@ import ctypes
 from engine.active_app import get_mapped_app
 from engine.gesture_engine import GestureEngine
 
-try:
-    import engine.mappings as store
-    import engine.macro_runner as macro_runner
-    #import engine.bluetooth_spp as bluetooth_spp
-except ImportError:
-    class _Store:
-        _data: dict = {}
-        @classmethod
-        def load(cls): return cls._data
-        @classmethod
-        def save(cls, d): cls._data = d
-    store = _Store
-
-    class _MacroRunner:
-        @staticmethod
-        def run_macro(m): print(f"[macro] {m}")
-    macro_runner = _MacroRunner
-
-    class _BT:
-        @staticmethod
-        def list_devices(): return []
-        @staticmethod
-        def connect(addr, cb): return None
-    bluetooth_spp = _BT
+import engine.mappings as store
+import engine.macro_runner as macro_runner
 
 
 # ── PALETTE ────────────────────────────────────────────────────────────────────
@@ -308,14 +286,19 @@ class GesturePuckApp:
         devrow.pack(fill="x", padx=20, pady=8)
 
         mk_label(devrow, "PORT", fg=TEXT_DIM).pack(side="left", padx=(0, 8))
-        self.port_var = tk.StringVar(value="/dev/cu.usbmodem2101")
-        tk.Entry(devrow, textvariable=self.port_var, bg=SURFACE, fg=TEXT,
-         insertbackground=ACCENT, relief="flat", width=24, font=FONT_MONO,
-         highlightthickness=1, highlightbackground=BORDER,
-         highlightcolor=ACCENT).pack(side="left", padx=(0, 8), ipady=3)
+        self.port_var = tk.StringVar(value="")
+        self._port_combo = ttk.Combobox(
+            devrow, textvariable=self.port_var,
+            width=26, font=FONT_MONO, state="normal",
+        )
+        self._port_combo.pack(side="left", padx=(0, 8), ipady=3)
+        # Auto-scan on startup so the combo is pre-filled
+        self.root.after(300, self._scan_ports_silent)
 
-       # mk_btn(devrow, "CONNECT", self._connect, bg=ACCENT, fg=BG).pack(side="left", padx=(0, 8))
-        mk_btn(devrow, "DEMO",    self._connect_demo, bg=SURFACE2, fg=TEXT_MED).pack(side="left")
+        mk_btn(devrow, "SCAN", self._scan_ports, bg=SURFACE2, fg=TEXT_MED).pack(side="left", padx=(0, 4))
+        mk_btn(devrow, "CONNECT", self._connect, bg=ACCENT, fg=BG).pack(side="left", padx=(0, 8))
+        mk_btn(devrow, "DEMO",    self._connect_demo, bg=SURFACE2, fg=TEXT_MED).pack(side="left", padx=(0, 8))
+        mk_btn(devrow, "DISCONNECT", self._disconnect, bg=SURFACE, fg=DEL_CLR).pack(side="left")
 
         # gesture pill
         gf = tk.Frame(devrow, bg=BG)
@@ -498,38 +481,89 @@ class GesturePuckApp:
                bg=SURFACE, fg=DEL_CLR).pack(side="left", padx=(0, 8))
 
     # ── DEVICE / CONNECT ──────────────────────────────────────────────────────
-    def _scan_devices(self):
-        pass
-        self._set_status("SCANNING…", TEXT_DIM)
+
+    def _list_serial_ports(self) -> list[str]:
+        """Return a list of available serial port device paths."""
+        try:
+            import serial.tools.list_ports  # type: ignore
+            return [p.device for p in serial.tools.list_ports.comports()]
+        except Exception:
+            return []
+
+    def _scan_ports_silent(self):
+        """Auto-scan called once at startup; fills combo quietly."""
         def task():
-            devs = bluetooth_spp.list_devices()
-            self.root.after(0, lambda: self._update_devices(devs))
+            ports = self._list_serial_ports()
+            self.root.after(0, lambda: self._apply_ports(ports, silent=True))
         threading.Thread(target=task, daemon=True).start()
 
-    def _update_devices(self, devices):
-        pass
-        self.devices = devices
-        names = [n for _, n in devices]
-        self.combo["values"] = names
-        if names:
-            self.combo.current(0)
-            self._set_status("DEVICES FOUND", TEXT_MED)
-        else:
-            self._set_status("NO DEVICES", TEXT_DIM)
+    def _scan_ports(self):
+        """Manual scan triggered by the SCAN button — shows feedback."""
+        self._set_status("SCANNING…", TEXT_DIM)
+        def task():
+            ports = self._list_serial_ports()
+            self.root.after(0, lambda: self._apply_ports(ports, silent=False))
+        threading.Thread(target=task, daemon=True).start()
+
+    def _apply_ports(self, ports: list[str], silent: bool):
+        """Populate the combobox; select a sensible default."""
+        self._port_combo["values"] = ports
+        if not ports:
+            if not silent:
+                self._set_status("NO PORTS FOUND", TEXT_DIM)
+                messagebox.showinfo(
+                    "No serial ports",
+                    "No serial ports were detected.\n\n"
+                    "Make sure the ESP32 is connected via USB, then click SCAN again.\n\n"
+                    "You can also type the port manually, e.g.:\n"
+                    "  macOS / Linux:  /dev/cu.usbmodem2101\n"
+                    "  Windows:        COM3",
+                )
+            return
+
+        # Pick the most plausible port (prefer usbmodem / usbserial / ttyUSB / COM3+)
+        preferred = None
+        for p in ports:
+            pl = p.lower()
+            if any(k in pl for k in ("usbmodem", "usbserial", "wchusbserial", "ttyusb", "ttyacm")):
+                preferred = p
+                break
+            if pl.startswith("com") and p not in ("COM1", "COM2"):
+                preferred = p
+        if preferred is None:
+            preferred = ports[0]
+
+        if not self.port_var.get():
+            self.port_var.set(preferred)
+
+        if not silent:
+            self._set_status(f"{len(ports)} port(s) found", TEXT_MED)
+            if len(ports) > 1:
+                messagebox.showinfo(
+                    "Ports found",
+                    "Multiple serial ports detected:\n\n" + "\n".join(ports) +
+                    "\n\nBest guess selected. Use the dropdown to change it."
+                )
 
     def _connect(self):
         port = self.port_var.get().strip()
         if not port:
-            messagebox.showerror("Error", "Enter a serial port")
+            messagebox.showerror("Error", "Enter a serial port path first.\n\nClick SCAN to auto-detect.")
             return
         self._start_engine(port=port, demo=False)
 
     def _connect_demo(self):
         self._start_engine(port=None, demo=True)
 
+    def _disconnect(self):
+        if self.engine is not None:
+            self.engine.stop()
+            self.engine = None
+        self._set_status("NOT CONNECTED", TEXT_DIM)
+
     def _start_engine(self, port, demo):
-    # Stop any existing engine first
-        if hasattr(self, "engine") and self.engine is not None:
+        # Stop any existing engine first
+        if self.engine is not None:
             self.engine.stop()
             self.engine = None
 
@@ -538,18 +572,24 @@ class GesturePuckApp:
         def task():
             try:
                 eng = GestureEngine(
-                port=port or "",
-                on_gesture=self._on_gesture_event,
-                demo=demo,
+                    port=port or "",
+                    on_gesture=self._on_gesture_event,
+                    demo=demo,
                 )
                 eng.start()
                 self.engine = eng
                 self.root.after(0, lambda: self._set_status(
-                "DEMO" if demo else "CONNECTED", ACCENT))
+                    "DEMO MODE" if demo else "CONNECTED", ACCENT))
             except Exception as exc:
                 self.root.after(0, lambda: self._set_status("ERROR", REC_CLR))
                 self.root.after(0, lambda: messagebox.showerror(
-                "Connection failed", str(exc)))
+                    "Connection failed",
+                    f"{exc}\n\n"
+                    "Tips:\n"
+                    "• Close any other app using the serial port (e.g. Arduino Serial Monitor)\n"
+                    "• Check the port path matches your device\n"
+                    "• Make sure the ESP32 firmware is flashed and running"
+                ))
         threading.Thread(target=task, daemon=True).start()
 
     def _set_status(self, text, color):
