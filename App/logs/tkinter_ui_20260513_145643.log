@@ -1,0 +1,92 @@
+[14:56:43.875] log_open: /Users/pc3/Documents/PlatformIO/Projects/gesturepuck/GesturePuck/App/logs/tkinter_ui_20260513_145643.log
+[14:56:43.876] startup: args={'port': '/dev/cu.usbserial-0001', 'baud': 115200, 'auto_connect': True, 'demo': False, 'serial_debug': True, 'serial_debug_bytes': False, 'ui_log': 'auto', 'serial_debug_log': 'auto'}
+[14:56:43.939] permissions_check: checking macOS Accessibility
+[14:56:44.073] permissions_check: returncode=0 stderr=''
+[14:56:44.073] app_init: default_port='/dev/cu.usbserial-0001' auto_connect=True demo=False baud=115200
+[14:56:44.074] recorder_listener: starting pynput keyboard listener
+[14:56:44.074] recorder_listener: started running=True
+[14:56:44.080] nav: show_page=Global
+[14:56:44.080] render: page=Global mappings=5
+[14:56:44.254] connect_click: port='/dev/cu.usbserial-0001'
+[14:56:44.254] connect: generation=1 demo=False port='/dev/cu.usbserial-0001' baud=115200 serial_debug=True serial_debug_log='auto'
+[14:56:44.254] status: NOT CONNECTED -> CONNECTING…
+[14:56:44.254] connect_thread: generation=1 constructing GestureEngine
+[14:56:44.255] engine_init: demo=False dual=True port='/dev/cu.usbserial-0001' baud=115200 calibration_frames=0
+[14:56:44.255] engine_status: OPENING SERIAL /dev/cu.usbserial-0001
+[14:56:44.255] engine_status: OPENING SERIAL /dev/cu.usbserial-0001
+[14:56:44.255] engine_source: opening DualSensorSerialFrameSource port='/dev/cu.usbserial-0001' baud=115200
+[14:56:44.261] engine_source: dual serial source opened
+[14:56:44.261] connect_thread: generation=1 starting engine
+[14:56:44.261] engine_start: starting source and processing thread
+[14:56:44.315] status: CONNECTING… -> OPENING SERIAL /dev/cu.usbserial-0001
+[14:56:45.267] engine_status: WAITING FOR FRAMES
+[14:56:45.267] engine_start: started
+[14:56:45.267] engine_status: WAITING FOR FRAMES
+[14:56:45.267] connect_thread: generation=1 engine.start returned
+[14:56:45.267] engine_wait: dual bytes=1020 reads=1 frames=0 tof1=0 tof2=0 single=0 text=0/3 prox=0 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=text: unrecognized line outside a ToF table: 'X,1023,1'
+[14:56:45.280] engine_status: RECEIVING FRAMES
+[14:56:45.280] engine_status: RECEIVING FRAMES
+[14:56:45.324] status: OPENING SERIAL /dev/cu.usbserial-0001 -> WAITING FOR FRAMES
+[14:56:45.324] status: WAITING FOR FRAMES -> RECEIVING FRAMES
+[14:56:47.277] engine_wait: dual bytes=19449 reads=823 frames=54 tof1=54 tof2=0 single=54 text=54/242 prox=54 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:56:47.522] recalibrate_click: engine_present=True
+[14:56:47.522] engine_status: RECALIBRATED
+[14:56:47.522] engine_status: RECALIBRATED
+[14:56:47.522] engine_recalibrate: state reset; background calibration disabled
+[14:56:47.522] status: RECEIVING FRAMES -> RECALIBRATED
+[14:56:49.285] engine_wait: dual bytes=31905 reads=1640 frames=90 tof1=90 tof2=0 single=90 text=90/314 prox=90 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:56:50.827] engine_gesture: name=swipe_up confidence=1.000 details=dx=-1.24 dy=-5.67 dz=-230mm fdx=+1.52 fdy=-0.52 dt=0.29s speed=20.32cells/s vz=-574mm/s lin=1.00 q=0.80; reason=exit
+[14:56:50.828] gesture: name=swipe_up confidence=1.000
+[14:56:50.877] engine_frames: frames_seen=100 protocol=dual-tof
+[14:56:51.293] engine_wait: dual bytes=44233 reads=2444 frames=125 tof1=125 tof2=0 single=125 text=125/384 prox=125 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:56:52.504] gesture_macro: active_app='Global' macro='cmd+shift+3'
+[14:56:52.655] macro_run: gesture=swipe_up macro='cmd+shift+3' result='screenshot:/Users/pc3/Desktop/GesturePuck-Screenshot-20260513-145652.png'
+[14:56:52.658] connect_watchdog: generation=1 frames_seen=131 status='RECALIBRATED' dual bytes=52729 reads=2994 frames=149 tof1=149 tof2=0 single=149 text=149/432 prox=149 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:56:53.297] engine_wait: dual bytes=56687 reads=3255 frames=160 tof1=160 tof2=0 single=160 text=160/454 prox=160 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:56:55.300] engine_wait: dual bytes=69140 reads=4064 frames=195 tof1=195 tof2=0 single=195 text=195/524 prox=195 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:56:56.572] engine_frames: frames_seen=200 protocol=dual-tof
+[14:56:57.306] engine_wait: dual bytes=81658 reads=4884 frames=230 tof1=230 tof2=0 single=230 text=230/594 prox=230 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:56:58.687] engine_gesture: name=swipe_up confidence=1.000 details=dx=-1.36 dy=-5.88 dz=-419mm fdx=+0.46 fdy=+1.17 dt=0.23s speed=26.15cells/s vz=-1917mm/s lin=0.99 q=0.53; reason=exit
+[14:56:58.696] gesture: name=swipe_up confidence=1.000
+[14:56:59.311] engine_wait: dual bytes=94092 reads=5696 frames=266 tof1=266 tof2=0 single=266 text=266/666 prox=266 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:00.371] gesture_macro: active_app='Global' macro='cmd+shift+3'
+[14:57:00.526] macro_run: gesture=swipe_up macro='cmd+shift+3' result='screenshot:/Users/pc3/Desktop/GesturePuck-Screenshot-20260513-145700.png'
+[14:57:01.321] engine_wait: dual bytes=106482 reads=6505 frames=301 tof1=301 tof2=0 single=301 text=301/736 prox=301 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:02.272] engine_frames: frames_seen=300 protocol=dual-tof
+[14:57:02.396] engine_gesture: name=swipe_up confidence=0.853 details=dx=-0.73 dy=-3.37 dz=-354mm fdx=-3.13 fdy=-1.04 dt=0.34s speed=10.06cells/s vz=-1214mm/s lin=0.83 q=0.72; reason=exit
+[14:57:02.428] gesture: name=swipe_up confidence=0.853
+[14:57:03.327] engine_wait: dual bytes=118935 reads=7309 frames=336 tof1=336 tof2=0 single=336 text=336/806 prox=336 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:04.097] gesture_macro: active_app='Global' macro='cmd+shift+3'
+[14:57:04.255] macro_run: gesture=swipe_up macro='cmd+shift+3' result='screenshot:/Users/pc3/Desktop/GesturePuck-Screenshot-20260513-145704.png'
+[14:57:05.232] engine_gesture: name=swipe_up confidence=1.000 details=dx=+1.56 dy=-5.80 dz=+38mm fdx=-1.11 fdy=-4.91 dt=0.34s speed=17.54cells/s vz=+208mm/s lin=0.89 q=0.85; reason=exit
+[14:57:05.269] gesture: name=swipe_up confidence=1.000
+[14:57:05.330] engine_wait: dual bytes=131469 reads=8126 frames=372 tof1=372 tof2=0 single=372 text=372/878 prox=372 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:06.953] gesture_macro: active_app='Global' macro='cmd+shift+3'
+[14:57:07.106] macro_run: gesture=swipe_up macro='cmd+shift+3' result='screenshot:/Users/pc3/Desktop/GesturePuck-Screenshot-20260513-145706.png'
+[14:57:07.335] engine_wait: dual bytes=144563 reads=8994 frames=409 tof1=409 tof2=0 single=409 text=409/952 prox=409 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:07.788] engine_frames: frames_seen=400 protocol=dual-tof
+[14:57:09.339] engine_wait: dual bytes=158529 reads=9932 frames=448 tof1=448 tof2=0 single=448 text=448/1030 prox=448 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:11.345] engine_wait: dual bytes=171467 reads=10787 frames=485 tof1=485 tof2=0 single=485 text=485/1104 prox=485 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:13.218] engine_frames: frames_seen=500 protocol=dual-tof
+[14:57:13.354] engine_wait: dual bytes=183857 reads=11595 frames=520 tof1=520 tof2=0 single=520 text=520/1174 prox=520 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:15.366] engine_wait: dual bytes=196439 reads=12419 frames=555 tof1=555 tof2=0 single=555 text=555/1244 prox=555 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:17.377] engine_wait: dual bytes=208991 reads=13255 frames=591 tof1=591 tof2=0 single=591 text=591/1316 prox=591 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:18.914] engine_frames: frames_seen=600 protocol=dual-tof
+[14:57:19.385] engine_wait: dual bytes=221381 reads=14082 frames=626 tof1=626 tof2=0 single=626 text=626/1386 prox=626 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:21.390] engine_wait: dual bytes=233771 reads=14905 frames=661 tof1=661 tof2=0 single=661 text=661/1456 prox=661 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:23.401] engine_wait: dual bytes=246321 reads=15734 frames=696 tof1=696 tof2=0 single=696 text=696/1526 prox=696 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:24.624] engine_frames: frames_seen=700 protocol=dual-tof
+[14:57:25.406] engine_wait: dual bytes=258807 reads=16559 frames=731 tof1=731 tof2=0 single=731 text=731/1596 prox=731 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:27.409] engine_wait: dual bytes=271295 reads=17379 frames=767 tof1=767 tof2=0 single=767 text=767/1668 prox=767 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:29.414] engine_wait: dual bytes=283685 reads=18194 frames=802 tof1=802 tof2=0 single=802 text=802/1738 prox=802 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:30.318] engine_frames: frames_seen=800 protocol=dual-tof
+[14:57:31.415] engine_wait: dual bytes=296074 reads=19010 frames=837 tof1=837 tof2=0 single=837 text=837/1808 prox=837 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:33.418] engine_wait: dual bytes=308624 reads=19853 frames=872 tof1=872 tof2=0 single=872 text=872/1878 prox=872 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:35.419] engine_wait: dual bytes=321850 reads=20735 frames=909 tof1=909 tof2=0 single=909 text=909/1952 prox=909 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:35.884] engine_frames: frames_seen=900 protocol=dual-tof
+[14:57:37.431] engine_wait: dual bytes=335368 reads=21644 frames=948 tof1=948 tof2=0 single=948 text=948/2030 prox=948 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:39.440] engine_wait: dual bytes=348498 reads=22514 frames=985 tof1=985 tof2=0 single=985 text=985/2104 prox=985 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:41.289] engine_frames: frames_seen=1000 protocol=dual-tof
+[14:57:41.441] engine_wait: dual bytes=361048 reads=23332 frames=1020 tof1=1020 tof2=0 single=1020 text=1020/2174 prox=1020 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:43.453] engine_wait: dual bytes=373600 reads=24153 frames=1056 tof1=1056 tof2=0 single=1056 text=1056/2246 prox=1056 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:57:45.457] engine_wait: dual bytes=385990 reads=24970 frames=1091 tof1=1091 tof2=0 single=1091 text=1091/2316 prox=1091 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True

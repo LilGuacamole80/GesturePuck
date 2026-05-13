@@ -1,0 +1,198 @@
+[14:38:13.180] log_open: /Users/pc3/Documents/PlatformIO/Projects/gesturepuck/GesturePuck/App/logs/tkinter_ui_20260513_143813.log
+[14:38:13.180] startup: args={'port': '/dev/cu.usbserial-0001', 'baud': 115200, 'auto_connect': True, 'demo': False, 'serial_debug': True, 'serial_debug_bytes': False, 'ui_log': 'auto', 'serial_debug_log': 'auto'}
+[14:38:13.239] permissions_check: checking macOS Accessibility
+[14:38:13.439] permissions_check: returncode=0 stderr=''
+[14:38:13.439] app_init: default_port='/dev/cu.usbserial-0001' auto_connect=True demo=False baud=115200
+[14:38:13.440] recorder_listener: starting pynput keyboard listener
+[14:38:13.440] recorder_listener: started running=True
+[14:38:13.446] nav: show_page=Global
+[14:38:13.446] render: page=Global mappings=1
+[14:38:13.619] connect_click: port='/dev/cu.usbserial-0001'
+[14:38:13.620] connect: generation=1 demo=False port='/dev/cu.usbserial-0001' baud=115200 serial_debug=True serial_debug_log='auto'
+[14:38:13.620] status: NOT CONNECTED -> CONNECTING…
+[14:38:13.620] connect_thread: generation=1 constructing GestureEngine
+[14:38:13.620] engine_init: demo=False dual=True port='/dev/cu.usbserial-0001' baud=115200 calibration_frames=0
+[14:38:13.621] engine_status: OPENING SERIAL /dev/cu.usbserial-0001
+[14:38:13.621] engine_status: OPENING SERIAL /dev/cu.usbserial-0001
+[14:38:13.641] engine_source: opening DualSensorSerialFrameSource port='/dev/cu.usbserial-0001' baud=115200
+[14:38:13.647] engine_source: dual serial source opened
+[14:38:13.647] connect_thread: generation=1 starting engine
+[14:38:13.647] engine_start: starting source and processing thread
+[14:38:14.652] engine_status: WAITING FOR FRAMES
+[14:38:14.652] engine_start: started
+[14:38:14.653] engine_status: WAITING FOR FRAMES
+[14:38:14.653] connect_thread: generation=1 engine.start returned
+[14:38:14.654] engine_wait: dual bytes=1020 reads=1 frames=0 tof1=1 tof2=0 single=0 text=1/3 prox=1 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=tof-frame: ToF #1 csv frame parsed seq=357 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.667] engine_status: RECEIVING FRAMES
+[14:38:14.667] engine_status: RECEIVING FRAMES
+[14:38:15.178] connect_click: port='/dev/cu.usbserial-0001'
+[14:38:15.178] connect: stopping existing engine before reconnect
+[14:38:15.178] engine_stop: stopping
+[14:38:15.189] engine_stop: stopped
+[14:38:15.189] connect: generation=2 demo=False port='/dev/cu.usbserial-0001' baud=115200 serial_debug=True serial_debug_log='auto'
+[14:38:15.189] connect_thread: generation=2 constructing GestureEngine
+[14:38:15.190] engine_init: demo=False dual=True port='/dev/cu.usbserial-0001' baud=115200 calibration_frames=0
+[14:38:15.190] engine_status: OPENING SERIAL /dev/cu.usbserial-0001
+[14:38:15.190] engine_status: OPENING SERIAL /dev/cu.usbserial-0001
+[14:38:15.210] engine_source: opening DualSensorSerialFrameSource port='/dev/cu.usbserial-0001' baud=115200
+[14:38:15.216] engine_source: dual serial source opened
+[14:38:15.216] connect_thread: generation=2 starting engine
+[14:38:15.216] engine_start: starting source and processing thread
+[14:38:16.220] engine_status: WAITING FOR FRAMES
+[14:38:16.220] engine_start: started
+[14:38:16.220] engine_status: WAITING FOR FRAMES
+[14:38:16.220] connect_thread: generation=2 engine.start returned
+[14:38:16.223] engine_wait: dual bytes=2040 reads=2 frames=0 tof1=0 tof2=0 single=0 text=0/113 prox=56 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.235] engine_status: RECEIVING FRAMES
+[14:38:16.235] engine_status: RECEIVING FRAMES
+[14:38:16.457] connect_click: port='/dev/cu.usbserial-0001'
+[14:38:16.457] connect: stopping existing engine before reconnect
+[14:38:16.457] engine_stop: stopping
+[14:38:16.461] engine_stop: stopped
+[14:38:16.461] connect: generation=3 demo=False port='/dev/cu.usbserial-0001' baud=115200 serial_debug=True serial_debug_log='auto'
+[14:38:16.461] connect_thread: generation=3 constructing GestureEngine
+[14:38:16.462] engine_init: demo=False dual=True port='/dev/cu.usbserial-0001' baud=115200 calibration_frames=0
+[14:38:16.462] engine_status: OPENING SERIAL /dev/cu.usbserial-0001
+[14:38:16.462] engine_status: OPENING SERIAL /dev/cu.usbserial-0001
+[14:38:16.483] engine_source: opening DualSensorSerialFrameSource port='/dev/cu.usbserial-0001' baud=115200
+[14:38:16.488] engine_source: dual serial source opened
+[14:38:16.488] connect_thread: generation=3 starting engine
+[14:38:16.488] engine_start: starting source and processing thread
+[14:38:16.650] connect_click: port='/dev/cu.usbserial-0001'
+[14:38:16.650] connect: stopping existing engine before reconnect
+[14:38:16.650] engine_stop: stopping
+[14:38:16.652] engine_stop: stopped
+[14:38:16.652] connect: generation=4 demo=False port='/dev/cu.usbserial-0001' baud=115200 serial_debug=True serial_debug_log='auto'
+[14:38:16.652] connect_thread: generation=4 constructing GestureEngine
+[14:38:16.653] engine_init: demo=False dual=True port='/dev/cu.usbserial-0001' baud=115200 calibration_frames=0
+[14:38:16.653] engine_status: OPENING SERIAL /dev/cu.usbserial-0001
+[14:38:16.653] engine_status: OPENING SERIAL /dev/cu.usbserial-0001
+[14:38:16.669] engine_source: opening DualSensorSerialFrameSource port='/dev/cu.usbserial-0001' baud=115200
+[14:38:16.674] engine_source: dual serial source opened
+[14:38:16.674] connect_thread: generation=4 starting engine
+[14:38:16.674] engine_start: starting source and processing thread
+[14:38:17.494] engine_status: WAITING FOR FRAMES
+[14:38:17.494] engine_start: started
+[14:38:17.494] engine_status: WAITING FOR FRAMES
+[14:38:17.494] connect_thread: generation=3 engine.start returned
+[14:38:17.678] engine_status: WAITING FOR FRAMES
+[14:38:17.678] engine_start: started
+[14:38:17.678] connect_thread: generation=4 engine.start returned
+[14:38:17.678] engine_status: WAITING FOR FRAMES
+[14:38:17.678] engine_wait: dual bytes=2040 reads=2 frames=0 tof1=0 tof2=0 single=0 text=0/2 prox=0 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=text: unrecognized line outside a ToF table: ',4000,4000,4000,,4000,4000,4000,,4000,4000,4
+[14:38:17.691] engine_status: RECEIVING FRAMES
+[14:38:17.691] engine_status: RECEIVING FRAMES
+[14:38:19.682] engine_wait: dual bytes=19608 reads=782 frames=52 tof1=52 tof2=0 single=52 text=52/106 prox=53 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:38:21.692] engine_wait: dual bytes=32051 reads=1562 frames=87 tof1=87 tof2=0 single=87 text=87/176 prox=88 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:38:23.304] engine_frames: frames_seen=100 protocol=dual-tof
+[14:38:23.697] engine_wait: dual bytes=44432 reads=2338 frames=122 tof1=122 tof2=0 single=122 text=122/246 prox=123 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:38:24.657] connect_watchdog: generation=4 frames_seen=123 status='CONNECTING…' dual bytes=50303 reads=2706 frames=139 tof1=139 tof2=0 single=139 text=139/280 prox=140 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:38:25.700] engine_wait: dual bytes=56748 reads=3114 frames=158 tof1=158 tof2=0 single=158 text=158/318 prox=159 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:38:27.701] engine_wait: dual bytes=69572 reads=3936 frames=194 tof1=194 tof2=0 single=194 text=194/390 prox=195 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:38:28.829] engine_frames: frames_seen=200 protocol=dual-tof
+[14:38:29.203] connect_click: port='/dev/cu.usbserial-0001'
+[14:38:29.203] connect: stopping existing engine before reconnect
+[14:38:29.203] engine_stop: stopping
+[14:38:29.213] engine_stop: stopped
+[14:38:29.213] connect: generation=5 demo=False port='/dev/cu.usbserial-0001' baud=115200 serial_debug=True serial_debug_log='auto'
+[14:38:29.214] connect_thread: generation=5 constructing GestureEngine
+[14:38:29.214] engine_init: demo=False dual=True port='/dev/cu.usbserial-0001' baud=115200 calibration_frames=0
+[14:38:29.215] engine_status: OPENING SERIAL /dev/cu.usbserial-0001
+[14:38:29.215] engine_status: OPENING SERIAL /dev/cu.usbserial-0001
+[14:38:29.234] engine_source: opening DualSensorSerialFrameSource port='/dev/cu.usbserial-0001' baud=115200
+[14:38:29.239] engine_source: dual serial source opened
+[14:38:29.239] connect_thread: generation=5 starting engine
+[14:38:29.239] engine_start: starting source and processing thread
+[14:38:29.357] connect_click: port='/dev/cu.usbserial-0001'
+[14:38:29.357] connect: stopping existing engine before reconnect
+[14:38:29.357] engine_stop: stopping
+[14:38:29.359] engine_stop: stopped
+[14:38:29.359] connect: generation=6 demo=False port='/dev/cu.usbserial-0001' baud=115200 serial_debug=True serial_debug_log='auto'
+[14:38:29.359] connect_thread: generation=6 constructing GestureEngine
+[14:38:29.359] engine_init: demo=False dual=True port='/dev/cu.usbserial-0001' baud=115200 calibration_frames=0
+[14:38:29.359] engine_status: OPENING SERIAL /dev/cu.usbserial-0001
+[14:38:29.359] engine_status: OPENING SERIAL /dev/cu.usbserial-0001
+[14:38:29.374] engine_source: opening DualSensorSerialFrameSource port='/dev/cu.usbserial-0001' baud=115200
+[14:38:29.379] engine_source: dual serial source opened
+[14:38:29.379] connect_thread: generation=6 starting engine
+[14:38:29.379] engine_start: starting source and processing thread
+[14:38:29.538] connect_click: port='/dev/cu.usbserial-0001'
+[14:38:29.538] connect: stopping existing engine before reconnect
+[14:38:29.538] engine_stop: stopping
+[14:38:29.540] engine_stop: stopped
+[14:38:29.540] connect: generation=7 demo=False port='/dev/cu.usbserial-0001' baud=115200 serial_debug=True serial_debug_log='auto'
+[14:38:29.540] connect_thread: generation=7 constructing GestureEngine
+[14:38:29.541] engine_init: demo=False dual=True port='/dev/cu.usbserial-0001' baud=115200 calibration_frames=0
+[14:38:29.541] engine_status: OPENING SERIAL /dev/cu.usbserial-0001
+[14:38:29.541] engine_status: OPENING SERIAL /dev/cu.usbserial-0001
+[14:38:29.559] engine_source: opening DualSensorSerialFrameSource port='/dev/cu.usbserial-0001' baud=115200
+[14:38:29.564] engine_source: dual serial source opened
+[14:38:29.564] connect_thread: generation=7 starting engine
+[14:38:29.564] engine_start: starting source and processing thread
+[14:38:30.244] engine_status: WAITING FOR FRAMES
+[14:38:30.244] engine_start: started
+[14:38:30.244] connect_thread: generation=5 engine.start returned
+[14:38:30.244] engine_status: WAITING FOR FRAMES
+[14:38:30.384] engine_status: WAITING FOR FRAMES
+[14:38:30.384] engine_start: started
+[14:38:30.384] engine_status: WAITING FOR FRAMES
+[14:38:30.384] connect_thread: generation=6 engine.start returned
+[14:38:30.569] engine_status: WAITING FOR FRAMES
+[14:38:30.569] engine_start: started
+[14:38:30.569] engine_status: WAITING FOR FRAMES
+[14:38:30.570] connect_thread: generation=7 engine.start returned
+[14:38:30.570] engine_wait: dual bytes=1020 reads=1 frames=0 tof1=0 tof2=0 single=0 text=0/2 prox=1 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:38:30.583] engine_status: RECEIVING FRAMES
+[14:38:30.583] engine_status: RECEIVING FRAMES
+[14:38:32.400] record_start: gesture=swipe_up page=Global
+[14:38:32.400] recorder_cancel: global recorder cancelled
+[14:38:32.400] recorder_arm: token=1 running=True
+[14:38:32.578] engine_wait: dual bytes=19943 reads=861 frames=56 tof1=56 tof2=0 single=56 text=56/114 prox=57 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:38:32.836] record_local_key_press: token=1 key=right chord=right
+[14:38:32.985] record_local_result: token=1 chord=right
+[14:38:32.985] recorder_cancel: global recorder cancelled
+[14:38:32.985] record_result_applied: token=1 gesture=swipe_up chord='right' source=tk
+[14:38:34.583] engine_wait: dual bytes=32323 reads=1637 frames=92 tof1=92 tof2=0 single=92 text=92/186 prox=93 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:38:36.069] engine_frames: frames_seen=100 protocol=dual-tof
+[14:38:36.595] engine_wait: dual bytes=44605 reads=2407 frames=127 tof1=127 tof2=0 single=127 text=127/256 prox=128 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:38:37.552] connect_watchdog: generation=7 frames_seen=125 status='CONNECTING…' dual bytes=50572 reads=2781 frames=144 tof1=144 tof2=0 single=144 text=144/290 prox=145 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:38:38.036] record_start: gesture=swipe_right page=Global
+[14:38:38.036] recorder_cancel: global recorder cancelled
+[14:38:38.036] recorder_arm: token=2 running=True
+[14:38:38.519] record_local_key_press: token=2 key=right chord=right
+[14:38:38.603] engine_wait: dual bytes=56954 reads=3181 frames=162 tof1=162 tof2=0 single=162 text=162/326 prox=163 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:38:38.646] record_local_result: token=2 chord=right
+[14:38:38.646] recorder_cancel: global recorder cancelled
+[14:38:38.646] record_result_applied: token=2 gesture=swipe_right chord='right' source=tk
+[14:38:39.957] record_start: gesture=swipe_left page=Global
+[14:38:39.957] recorder_cancel: global recorder cancelled
+[14:38:39.957] recorder_arm: token=3 running=True
+[14:38:40.233] record_local_key_press: token=3 key=right chord=right
+[14:38:40.401] record_local_result: token=3 chord=right
+[14:38:40.402] recorder_cancel: global recorder cancelled
+[14:38:40.402] record_result_applied: token=3 gesture=swipe_left chord='right' source=tk
+[14:38:40.603] engine_wait: dual bytes=69303 reads=3955 frames=197 tof1=197 tof2=0 single=197 text=197/396 prox=198 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:38:41.765] engine_frames: frames_seen=200 protocol=dual-tof
+[14:38:41.803] record_start: gesture=swipe_down page=Global
+[14:38:41.803] recorder_cancel: global recorder cancelled
+[14:38:41.804] recorder_arm: token=4 running=True
+[14:38:42.227] record_local_key_press: token=4 key=down chord=down
+[14:38:42.375] record_local_result: token=4 chord=down
+[14:38:42.376] recorder_cancel: global recorder cancelled
+[14:38:42.376] record_result_applied: token=4 gesture=swipe_down chord='down' source=tk
+[14:38:42.607] engine_wait: dual bytes=81684 reads=4731 frames=232 tof1=232 tof2=0 single=232 text=232/466 prox=233 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:38:43.371] record_start: gesture=push page=Global
+[14:38:43.371] recorder_cancel: global recorder cancelled
+[14:38:43.371] recorder_arm: token=5 running=True
+[14:38:43.730] record_local_key_press: token=5 key=up chord=up
+[14:38:43.815] record_local_result: token=5 chord=up
+[14:38:43.816] recorder_cancel: global recorder cancelled
+[14:38:43.816] record_result_applied: token=5 gesture=push chord='up' source=tk
+[14:38:44.610] engine_wait: dual bytes=94065 reads=5507 frames=267 tof1=267 tof2=0 single=267 text=267/536 prox=268 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:38:46.611] engine_wait: dual bytes=106381 reads=6279 frames=303 tof1=303 tof2=0 single=303 text=303/608 prox=304 hand=0 bad=0 csum_err=0 drop_bytes=0 serial_err=0 last=apds: #PROX proximity=1023 hand=True
+[14:38:46.781] mapping_delete: page=Global gesture=push
+[14:38:46.781] render: page=Global mappings=1
+[14:38:47.464] engine_frames: frames_seen=300 protocol=dual-tof
+[14:38:47.936] app_close: closing GesturePuck UI
+[14:38:47.936] engine_stop: stopping
+[14:38:47.948] engine_stop: stopped

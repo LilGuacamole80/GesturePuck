@@ -1,0 +1,135 @@
+[14:38:14.652] serial: starting dual reader for /dev/cu.usbserial-0001 at 115200 baud
+[14:38:14.653] line: 212 bytes ascii='00,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,40' (+32 bytes)
+[14:38:14.653] text: unrecognized line outside a ToF table: '00,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,40'
+[14:38:14.653] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.653] apds: #PROX proximity=1023 hand=True
+[14:38:14.653] line: 335 bytes ascii='FRAME,357,30245,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.654] tof-frame: ToF #1 csv frame parsed seq=357 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.654] emit: single-sensor dual packet #1 primary=ToF#1 seq=357 proximity=1023 hand=True
+[14:38:14.654] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.654] apds: #PROX proximity=1023 hand=True
+[14:38:14.654] line: 335 bytes ascii='FRAME,358,30302,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.654] tof-frame: ToF #1 csv frame parsed seq=358 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.654] emit: single-sensor dual packet #2 primary=ToF#1 seq=358 proximity=1023 hand=True
+[14:38:14.654] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.654] apds: #PROX proximity=1023 hand=True
+[14:38:14.655] line: 335 bytes ascii='FRAME,359,30359,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.655] tof-frame: ToF #1 csv frame parsed seq=359 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.655] emit: single-sensor dual packet #3 primary=ToF#1 seq=359 proximity=1023 hand=True
+[14:38:14.655] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.655] apds: #PROX proximity=1023 hand=True
+[14:38:14.655] line: 335 bytes ascii='FRAME,360,30416,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.655] tof-frame: ToF #1 csv frame parsed seq=360 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.655] emit: single-sensor dual packet #4 primary=ToF#1 seq=360 proximity=1023 hand=True
+[14:38:14.655] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.655] apds: #PROX proximity=1023 hand=True
+[14:38:14.655] line: 335 bytes ascii='FRAME,361,30473,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.655] tof-frame: ToF #1 csv frame parsed seq=361 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.655] emit: single-sensor dual packet #5 primary=ToF#1 seq=361 proximity=1023 hand=True
+[14:38:14.655] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.655] apds: #PROX proximity=1023 hand=True
+[14:38:14.655] line: 335 bytes ascii='FRAME,362,30530,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.655] tof-frame: ToF #1 csv frame parsed seq=362 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.655] emit: single-sensor dual packet #6 primary=ToF#1 seq=362 proximity=1023 hand=True
+[14:38:14.655] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.655] apds: #PROX proximity=1023 hand=True
+[14:38:14.655] line: 335 bytes ascii='FRAME,363,30587,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.655] tof-frame: ToF #1 csv frame parsed seq=363 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.655] emit: single-sensor dual packet #7 primary=ToF#1 seq=363 proximity=1023 hand=True
+[14:38:14.655] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.655] apds: #PROX proximity=1023 hand=True
+[14:38:14.655] line: 335 bytes ascii='FRAME,364,30644,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.655] tof-frame: ToF #1 csv frame parsed seq=364 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.655] emit: single-sensor dual packet #8 primary=ToF#1 seq=364 proximity=1023 hand=True
+[14:38:14.655] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.655] apds: #PROX proximity=1023 hand=True
+[14:38:14.655] line: 335 bytes ascii='FRAME,365,30701,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.655] tof-frame: ToF #1 csv frame parsed seq=365 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.655] emit: single-sensor dual packet #9 primary=ToF#1 seq=365 proximity=1023 hand=True
+[14:38:14.655] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.655] apds: #PROX proximity=1023 hand=True
+[14:38:14.655] line: 335 bytes ascii='FRAME,366,30758,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.656] tof-frame: ToF #1 csv frame parsed seq=366 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.656] emit: single-sensor dual packet #10 primary=ToF#1 seq=366 proximity=1023 hand=True
+[14:38:14.656] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.656] apds: #PROX proximity=1023 hand=True
+[14:38:14.656] line: 335 bytes ascii='FRAME,367,30815,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.656] tof-frame: ToF #1 csv frame parsed seq=367 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.656] emit: single-sensor dual packet #11 primary=ToF#1 seq=367 proximity=1023 hand=True
+[14:38:14.656] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.656] apds: #PROX proximity=1023 hand=True
+[14:38:14.656] line: 335 bytes ascii='FRAME,368,30872,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.656] tof-frame: ToF #1 csv frame parsed seq=368 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.656] emit: single-sensor dual packet #12 primary=ToF#1 seq=368 proximity=1023 hand=True
+[14:38:14.656] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.656] apds: #PROX proximity=1023 hand=True
+[14:38:14.656] line: 335 bytes ascii='FRAME,369,30929,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.656] tof-frame: ToF #1 csv frame parsed seq=369 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.656] emit: single-sensor dual packet #13 primary=ToF#1 seq=369 proximity=1023 hand=True
+[14:38:14.656] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.656] apds: #PROX proximity=1023 hand=True
+[14:38:14.656] line: 335 bytes ascii='FRAME,370,30986,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.656] tof-frame: ToF #1 csv frame parsed seq=370 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.656] emit: single-sensor dual packet #14 primary=ToF#1 seq=370 proximity=1023 hand=True
+[14:38:14.656] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.656] apds: #PROX proximity=1023 hand=True
+[14:38:14.656] line: 335 bytes ascii='FRAME,371,31043,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.656] tof-frame: ToF #1 csv frame parsed seq=371 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.656] emit: single-sensor dual packet #15 primary=ToF#1 seq=371 proximity=1023 hand=True
+[14:38:14.656] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.656] apds: #PROX proximity=1023 hand=True
+[14:38:14.656] line: 335 bytes ascii='FRAME,372,31100,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.656] tof-frame: ToF #1 csv frame parsed seq=372 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.656] emit: single-sensor dual packet #16 primary=ToF#1 seq=372 proximity=1023 hand=True
+[14:38:14.656] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.656] apds: #PROX proximity=1023 hand=True
+[14:38:14.656] line: 335 bytes ascii='FRAME,373,31157,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.656] tof-frame: ToF #1 csv frame parsed seq=373 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.656] emit: single-sensor dual packet #17 primary=ToF#1 seq=373 proximity=1023 hand=True
+[14:38:14.656] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.656] apds: #PROX proximity=1023 hand=True
+[14:38:14.691] line: 334 bytes ascii='FRAME,374,31214,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,901,4000,4000,4000,4000,4000,4000,4000,4000,4000,' (+154 bytes)
+[14:38:14.692] tof-frame: ToF #1 csv frame parsed seq=374 finite=64/64 min=901 max=4000 mean=3952
+[14:38:14.692] emit: single-sensor dual packet #18 primary=ToF#1 seq=374 proximity=1023 hand=True
+[14:38:14.692] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.692] apds: #PROX proximity=1023 hand=True
+[14:38:14.748] line: 335 bytes ascii='FRAME,375,31271,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.749] tof-frame: ToF #1 csv frame parsed seq=375 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.749] emit: single-sensor dual packet #19 primary=ToF#1 seq=375 proximity=1023 hand=True
+[14:38:14.749] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.749] apds: #PROX proximity=1023 hand=True
+[14:38:14.805] line: 335 bytes ascii='FRAME,376,31328,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.806] tof-frame: ToF #1 csv frame parsed seq=376 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.806] emit: single-sensor dual packet #20 primary=ToF#1 seq=376 proximity=1023 hand=True
+[14:38:14.806] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.806] apds: #PROX proximity=1023 hand=True
+[14:38:14.862] line: 335 bytes ascii='FRAME,377,31385,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.863] tof-frame: ToF #1 csv frame parsed seq=377 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.863] emit: single-sensor dual packet #21 primary=ToF#1 seq=377 proximity=1023 hand=True
+[14:38:14.863] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.863] apds: #PROX proximity=1023 hand=True
+[14:38:14.919] line: 335 bytes ascii='FRAME,378,31442,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.920] tof-frame: ToF #1 csv frame parsed seq=378 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.920] emit: single-sensor dual packet #22 primary=ToF#1 seq=378 proximity=1023 hand=True
+[14:38:14.920] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.920] apds: #PROX proximity=1023 hand=True
+[14:38:14.976] line: 335 bytes ascii='FRAME,379,31499,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:14.977] tof-frame: ToF #1 csv frame parsed seq=379 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:14.977] emit: single-sensor dual packet #23 primary=ToF#1 seq=379 proximity=1023 hand=True
+[14:38:14.977] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:14.977] apds: #PROX proximity=1023 hand=True
+[14:38:15.033] line: 335 bytes ascii='FRAME,380,31556,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:15.034] tof-frame: ToF #1 csv frame parsed seq=380 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:15.034] emit: single-sensor dual packet #24 primary=ToF#1 seq=380 proximity=1023 hand=True
+[14:38:15.034] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:15.034] apds: #PROX proximity=1023 hand=True
+[14:38:15.090] line: 335 bytes ascii='FRAME,381,31613,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:15.091] tof-frame: ToF #1 csv frame parsed seq=381 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:15.091] emit: single-sensor dual packet #25 primary=ToF#1 seq=381 proximity=1023 hand=True
+[14:38:15.091] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:15.091] apds: #PROX proximity=1023 hand=True
+[14:38:15.147] line: 335 bytes ascii='FRAME,382,31670,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:15.148] tof-frame: ToF #1 csv frame parsed seq=382 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:15.148] emit: single-sensor dual packet #26 primary=ToF#1 seq=382 proximity=1023 hand=True
+[14:38:15.148] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:15.148] apds: #PROX proximity=1023 hand=True

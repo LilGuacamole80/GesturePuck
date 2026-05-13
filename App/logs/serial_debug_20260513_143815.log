@@ -1,0 +1,914 @@
+[14:38:16.219] serial: starting dual reader for /dev/cu.usbserial-0001 at 115200 baud
+[14:38:16.220] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.220] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.220] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.220] apds: #PROX proximity=1023 hand=True
+[14:38:16.220] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.220] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.220] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.220] apds: #PROX proximity=1023 hand=True
+[14:38:16.220] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.220] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.220] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.220] apds: #PROX proximity=1023 hand=True
+[14:38:16.220] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.220] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.220] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.220] apds: #PROX proximity=1023 hand=True
+[14:38:16.220] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.220] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.220] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.220] apds: #PROX proximity=1023 hand=True
+[14:38:16.220] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.220] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.220] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.220] apds: #PROX proximity=1023 hand=True
+[14:38:16.220] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.220] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.220] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.220] apds: #PROX proximity=1023 hand=True
+[14:38:16.220] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.221] apds: #PROX proximity=1023 hand=True
+[14:38:16.221] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.221] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.221] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.222] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.222] apds: #PROX proximity=1023 hand=True
+[14:38:16.222] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.222] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.223] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.223] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.223] apds: #PROX proximity=1023 hand=True
+[14:38:16.223] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.224] apds: #PROX proximity=1023 hand=True
+[14:38:16.224] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.224] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.224] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.225] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.225] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.225] apds: #PROX proximity=1023 hand=True
+[14:38:16.225] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.226] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.226] apds: #PROX proximity=1023 hand=True
+[14:38:16.226] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.226] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 15 bytes ascii=',4000,4000,4000'
+[14:38:16.227] text: unrecognized line outside a ToF table: ',4000,4000,4000'
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 2223 bytes ascii='FRAME,384,31784,4000,4000,4000,4FRAME,384,31784,4000,4000,4000,4FRAME,384,31784,4000,4000,4000,4FRAME,384,31784,4000,4000,4000,4FRAME,384,31784,4000,4000,4000,4FRAME,384,31784,4000' (+2043 bytes)
+[14:38:16.227] tof-frame: ToF #1 csv frame parsed seq=4000 finite=64/64 min=4000 max=400000 mean=10188
+[14:38:16.227] emit: single-sensor dual packet #1 primary=ToF#1 seq=4000 proximity=1023 hand=True
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 335 bytes ascii='FRAME,385,31841,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.227] tof-frame: ToF #1 csv frame parsed seq=385 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.227] emit: single-sensor dual packet #2 primary=ToF#1 seq=385 proximity=1023 hand=True
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 335 bytes ascii='FRAME,386,31898,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,1312,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.227] tof-frame: ToF #1 csv frame parsed seq=386 finite=64/64 min=1312 max=4000 mean=3958
+[14:38:16.227] emit: single-sensor dual packet #3 primary=ToF#1 seq=386 proximity=1023 hand=True
+[14:38:16.227] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.227] apds: #PROX proximity=1023 hand=True
+[14:38:16.227] line: 335 bytes ascii='FRAME,387,31955,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.228] tof-frame: ToF #1 csv frame parsed seq=387 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.228] emit: single-sensor dual packet #4 primary=ToF#1 seq=387 proximity=1023 hand=True
+[14:38:16.228] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.228] apds: #PROX proximity=1023 hand=True
+[14:38:16.228] line: 335 bytes ascii='FRAME,388,32012,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.228] tof-frame: ToF #1 csv frame parsed seq=388 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.228] emit: single-sensor dual packet #5 primary=ToF#1 seq=388 proximity=1023 hand=True
+[14:38:16.228] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.228] apds: #PROX proximity=1023 hand=True
+[14:38:16.228] line: 335 bytes ascii='FRAME,389,32069,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.228] tof-frame: ToF #1 csv frame parsed seq=389 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.228] emit: single-sensor dual packet #6 primary=ToF#1 seq=389 proximity=1023 hand=True
+[14:38:16.228] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.228] apds: #PROX proximity=1023 hand=True
+[14:38:16.228] line: 335 bytes ascii='FRAME,390,32126,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.228] tof-frame: ToF #1 csv frame parsed seq=390 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.228] emit: single-sensor dual packet #7 primary=ToF#1 seq=390 proximity=1023 hand=True
+[14:38:16.228] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.228] apds: #PROX proximity=1023 hand=True
+[14:38:16.228] line: 335 bytes ascii='FRAME,391,32183,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.228] tof-frame: ToF #1 csv frame parsed seq=391 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.228] emit: single-sensor dual packet #8 primary=ToF#1 seq=391 proximity=1023 hand=True
+[14:38:16.228] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.228] apds: #PROX proximity=1023 hand=True
+[14:38:16.228] line: 335 bytes ascii='FRAME,392,32240,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.228] tof-frame: ToF #1 csv frame parsed seq=392 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.228] emit: single-sensor dual packet #9 primary=ToF#1 seq=392 proximity=1023 hand=True
+[14:38:16.228] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.228] apds: #PROX proximity=1023 hand=True
+[14:38:16.228] line: 335 bytes ascii='FRAME,393,32297,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.228] tof-frame: ToF #1 csv frame parsed seq=393 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.228] emit: single-sensor dual packet #10 primary=ToF#1 seq=393 proximity=1023 hand=True
+[14:38:16.228] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.228] apds: #PROX proximity=1023 hand=True
+[14:38:16.228] line: 335 bytes ascii='FRAME,394,32354,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.228] tof-frame: ToF #1 csv frame parsed seq=394 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.228] emit: single-sensor dual packet #11 primary=ToF#1 seq=394 proximity=1023 hand=True
+[14:38:16.228] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.228] apds: #PROX proximity=1023 hand=True
+[14:38:16.228] line: 335 bytes ascii='FRAME,395,32411,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.228] tof-frame: ToF #1 csv frame parsed seq=395 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.228] emit: single-sensor dual packet #12 primary=ToF#1 seq=395 proximity=1023 hand=True
+[14:38:16.228] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.228] apds: #PROX proximity=1023 hand=True
+[14:38:16.228] line: 335 bytes ascii='FRAME,396,32468,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.228] tof-frame: ToF #1 csv frame parsed seq=396 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.228] emit: single-sensor dual packet #13 primary=ToF#1 seq=396 proximity=1023 hand=True
+[14:38:16.228] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.228] apds: #PROX proximity=1023 hand=True
+[14:38:16.228] line: 335 bytes ascii='FRAME,397,32525,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.228] tof-frame: ToF #1 csv frame parsed seq=397 finite=64/64 min=1256 max=4000 mean=3957
+[14:38:16.228] emit: single-sensor dual packet #14 primary=ToF#1 seq=397 proximity=1023 hand=True
+[14:38:16.228] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.228] apds: #PROX proximity=1023 hand=True
+[14:38:16.228] line: 335 bytes ascii='FRAME,398,32582,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.228] tof-frame: ToF #1 csv frame parsed seq=398 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.228] emit: single-sensor dual packet #15 primary=ToF#1 seq=398 proximity=1023 hand=True
+[14:38:16.228] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.228] apds: #PROX proximity=1023 hand=True
+[14:38:16.228] line: 335 bytes ascii='FRAME,399,32639,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.228] tof-frame: ToF #1 csv frame parsed seq=399 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.228] emit: single-sensor dual packet #16 primary=ToF#1 seq=399 proximity=1023 hand=True
+[14:38:16.228] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.228] apds: #PROX proximity=1023 hand=True
+[14:38:16.228] line: 335 bytes ascii='FRAME,400,32696,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.228] tof-frame: ToF #1 csv frame parsed seq=400 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.228] emit: single-sensor dual packet #17 primary=ToF#1 seq=400 proximity=1023 hand=True
+[14:38:16.228] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.228] apds: #PROX proximity=1023 hand=True
+[14:38:16.230] line: 335 bytes ascii='FRAME,401,32753,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.230] tof-frame: ToF #1 csv frame parsed seq=401 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.230] emit: single-sensor dual packet #18 primary=ToF#1 seq=401 proximity=1023 hand=True
+[14:38:16.230] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.231] apds: #PROX proximity=1023 hand=True
+[14:38:16.287] line: 335 bytes ascii='FRAME,402,32810,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.288] tof-frame: ToF #1 csv frame parsed seq=402 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.288] emit: single-sensor dual packet #19 primary=ToF#1 seq=402 proximity=1023 hand=True
+[14:38:16.288] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.288] apds: #PROX proximity=1023 hand=True
+[14:38:16.344] line: 335 bytes ascii='FRAME,403,32867,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.345] tof-frame: ToF #1 csv frame parsed seq=403 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.345] emit: single-sensor dual packet #20 primary=ToF#1 seq=403 proximity=1023 hand=True
+[14:38:16.345] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.345] apds: #PROX proximity=1023 hand=True
+[14:38:16.401] line: 335 bytes ascii='FRAME,404,32924,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000,4000' (+155 bytes)
+[14:38:16.402] tof-frame: ToF #1 csv frame parsed seq=404 finite=64/64 min=4000 max=4000 mean=4000
+[14:38:16.402] emit: single-sensor dual packet #21 primary=ToF#1 seq=404 proximity=1023 hand=True
+[14:38:16.402] line: 12 bytes ascii='#PROX,1023,1'
+[14:38:16.402] apds: #PROX proximity=1023 hand=True
