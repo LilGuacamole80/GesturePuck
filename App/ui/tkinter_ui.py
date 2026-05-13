@@ -8,11 +8,12 @@ import subprocess
 import sys
 import ctypes
 from engine.active_app import get_mapped_app
+from engine.gesture_engine import GestureEngine
 
 try:
     import engine.mappings as store
     import engine.macro_runner as macro_runner
-    import engine.bluetooth_spp as bluetooth_spp
+    #import engine.bluetooth_spp as bluetooth_spp
 except ImportError:
     class _Store:
         _data: dict = {}
@@ -93,6 +94,12 @@ MODIFIER_KEYS = {
     pynput_kb.Key.alt,     pynput_kb.Key.alt_l,   pynput_kb.Key.alt_r,
     pynput_kb.Key.cmd,
 }
+
+KNOWN_GESTURES = [
+        "swipe_left", "swipe_right", "swipe_up", "swipe_down",
+        "push", "pull", "hold_center"
+    ]
+
 for _k in ("cmd_l", "cmd_r"):
     _v = getattr(pynput_kb.Key, _k, None)
     if _v:
@@ -246,6 +253,7 @@ class GesturePuckApp:
         self.devices      = []
         self.connection   = None
         self.current_page = "Global"
+        self.engine       = None          # ← add this
 
         self._macro_vars: dict[str, tk.StringVar] = {}
         self._label_vars: dict[str, tk.StringVar] = {}
@@ -260,8 +268,9 @@ class GesturePuckApp:
 
         self._build_ui()
         self._show_page("Global")
-        self._scan_devices()
         self.root.after(50, self._poll_recorder)
+
+        
 
     # ── BUILD ──────────────────────────────────────────────────────────────────
     def _build_ui(self):
@@ -295,33 +304,18 @@ class GesturePuckApp:
         self._status_lbl.pack(side="left", padx=(4, 0))
 
         # ── DEVICE BAR ────────────────────────────────────────────────────────
-        devbar = tk.Frame(self.root, bg=BORDER, height=1)
-        devbar.pack(fill="x")
-
         devrow = tk.Frame(self.root, bg=BG)
         devrow.pack(fill="x", padx=20, pady=8)
 
-        mk_label(devrow, "DEVICE", fg=TEXT_DIM).pack(side="left", padx=(0, 8))
+        mk_label(devrow, "PORT", fg=TEXT_DIM).pack(side="left", padx=(0, 8))
+        self.port_var = tk.StringVar(value="/dev/cu.usbmodem2101")
+        tk.Entry(devrow, textvariable=self.port_var, bg=SURFACE, fg=TEXT,
+         insertbackground=ACCENT, relief="flat", width=24, font=FONT_MONO,
+         highlightthickness=1, highlightbackground=BORDER,
+         highlightcolor=ACCENT).pack(side="left", padx=(0, 8), ipady=3)
 
-        style = ttk.Style()
-        style.theme_use("default")
-        style.configure("Dark.TCombobox",
-                         fieldbackground=SURFACE,
-                         background=SURFACE,
-                         foreground=TEXT,
-                         selectbackground=SURFACE2,
-                         selectforeground=TEXT,
-                         arrowcolor=ACCENT)
-
-        self.combo = ttk.Combobox(devrow, textvariable=self.device_var,
-                                  state="readonly", style="Dark.TCombobox",
-                                  width=32)
-        self.combo.pack(side="left", padx=(0, 8))
-
-        mk_btn(devrow, "SCAN",    self._scan_devices,
-               bg=SURFACE2, fg=TEXT_MED).pack(side="left", padx=(0, 4))
-        mk_btn(devrow, "CONNECT", self._connect,
-               bg=ACCENT,   fg=BG).pack(side="left")
+       # mk_btn(devrow, "CONNECT", self._connect, bg=ACCENT, fg=BG).pack(side="left", padx=(0, 8))
+        mk_btn(devrow, "DEMO",    self._connect_demo, bg=SURFACE2, fg=TEXT_MED).pack(side="left")
 
         # gesture pill
         gf = tk.Frame(devrow, bg=BG)
@@ -418,6 +412,7 @@ class GesturePuckApp:
         self._render_page(app_name)
 
     # ── RENDER ────────────────────────────────────────────────────────────────
+
     def _render_page(self, app_name):
         for w in self.content_frame.winfo_children():
             w.destroy()
@@ -425,49 +420,31 @@ class GesturePuckApp:
         self._label_vars.clear()
         self._entries.clear()
 
-        # page header
         header = tk.Frame(self.content_frame, bg=BG)
         header.pack(fill="x", padx=24, pady=(20, 4))
-
         tk.Label(header, text=app_name, bg=BG, fg=ACCENT,
-                 font=("Courier New", 16, "bold")).pack(side="left")
+             font=("Courier New", 16, "bold")).pack(side="left")
         tk.Label(header, text="  ·  Gesture Mappings", bg=BG,
-                 fg=TEXT_DIM, font=FONT_LABEL).pack(side="left")
+             fg=TEXT_DIM, font=FONT_LABEL).pack(side="left")
 
-        mk_separator(self.content_frame, BORDER).pack(
-            fill="x", padx=24, pady=(8, 0))
+        mk_separator(self.content_frame, BORDER).pack(fill="x", padx=24, pady=(8, 0))
 
-        # column headers
         hdr = tk.Frame(self.content_frame, bg=BG)
         hdr.pack(fill="x", padx=24, pady=(6, 2))
         for col, w in [("GESTURE", 18), ("LABEL", 22), ("MACRO / SHORTCUT", 26)]:
             tk.Label(hdr, text=col, bg=BG, fg=TEXT_DIM,
-                     font=FONT_BADGE, width=w, anchor="w").pack(side="left")
+                 font=FONT_BADGE, width=w, anchor="w").pack(side="left")
         tk.Label(hdr, text="ACTIONS", bg=BG, fg=TEXT_DIM,
-                 font=FONT_BADGE).pack(side="left")
+             font=FONT_BADGE).pack(side="left")
 
-        mk_separator(self.content_frame, BORDER).pack(
-            fill="x", padx=24, pady=(2, 4))
+        mk_separator(self.content_frame, BORDER).pack(fill="x", padx=24, pady=(2, 4))
 
         rows = self.mappings.get(app_name, {})
-        if not rows:
-            tk.Label(self.content_frame,
-                     text="No gestures yet. Click + ADD GESTURE to create one.",
-                     bg=BG, fg=TEXT_DIM, font=FONT_LABEL).pack(
-                         anchor="w", padx=24, pady=12)
-        else:
-            for i, (gesture, data) in enumerate(rows.items()):
-                self._add_row(gesture,
-                              data.get("label", gesture),
-                              data.get("macro", ""),
-                              alt=(i % 2 == 1))
+        for i, gesture in enumerate(KNOWN_GESTURES):
+            data = rows.get(gesture, {"label": gesture, "macro": ""})
+            self._add_row(gesture, data.get("label", gesture),
+                      data.get("macro", ""), alt=(i % 2 == 1))
 
-        mk_separator(self.content_frame, BORDER).pack(
-            fill="x", padx=24, pady=(8, 0))
-
-        mk_btn(self.content_frame, "+ ADD GESTURE",
-               lambda: self._add_new_gesture(app_name),
-               bg=SURFACE2, fg=ACCENT).pack(anchor="w", padx=24, pady=12)
 
     def _add_row(self, gesture, label, macro, alt=False):
         row_bg = SURFACE2 if alt else SURFACE
@@ -522,6 +499,7 @@ class GesturePuckApp:
 
     # ── DEVICE / CONNECT ──────────────────────────────────────────────────────
     def _scan_devices(self):
+        pass
         self._set_status("SCANNING…", TEXT_DIM)
         def task():
             devs = bluetooth_spp.list_devices()
@@ -529,6 +507,7 @@ class GesturePuckApp:
         threading.Thread(target=task, daemon=True).start()
 
     def _update_devices(self, devices):
+        pass
         self.devices = devices
         names = [n for _, n in devices]
         self.combo["values"] = names
@@ -539,14 +518,38 @@ class GesturePuckApp:
             self._set_status("NO DEVICES", TEXT_DIM)
 
     def _connect(self):
-        name = self.device_var.get()
-        addr = next((a for a, n in self.devices if n == name), None)
-        if not addr:
-            messagebox.showerror("Error", "Select a valid device")
+        port = self.port_var.get().strip()
+        if not port:
+            messagebox.showerror("Error", "Enter a serial port")
             return
+        self._start_engine(port=port, demo=False)
+
+    def _connect_demo(self):
+        self._start_engine(port=None, demo=True)
+
+    def _start_engine(self, port, demo):
+    # Stop any existing engine first
+        if hasattr(self, "engine") and self.engine is not None:
+            self.engine.stop()
+            self.engine = None
+
+        self._set_status("CONNECTING…", TEXT_DIM)
+
         def task():
-            self.connection = bluetooth_spp.connect(addr, self._on_event)
-            self.root.after(0, lambda: self._set_status("CONNECTED", ACCENT))
+            try:
+                eng = GestureEngine(
+                port=port or "",
+                on_gesture=self._on_gesture_event,
+                demo=demo,
+                )
+                eng.start()
+                self.engine = eng
+                self.root.after(0, lambda: self._set_status(
+                "DEMO" if demo else "CONNECTED", ACCENT))
+            except Exception as exc:
+                self.root.after(0, lambda: self._set_status("ERROR", REC_CLR))
+                self.root.after(0, lambda: messagebox.showerror(
+                "Connection failed", str(exc)))
         threading.Thread(target=task, daemon=True).start()
 
     def _set_status(self, text, color):
@@ -558,8 +561,28 @@ class GesturePuckApp:
         self._status_dot.create_oval(0, 0, 8, 8, fill=dot_color, outline="")
 
     # ── EVENTS ────────────────────────────────────────────────────────────────
+    def _on_gesture_event(self, gesture_name: str, confidence: float):
+    # Engine runs in a background thread, so use root.after() 
+    # to safely touch the UI from the main thread
+        self.root.after(0, lambda: self._handle_gesture(gesture_name, confidence))
+
+    def _handle_gesture(self, gesture_name: str, confidence: float):
+        self.last_gesture.set(f"{gesture_name} ({confidence:.0%})")
+    
+        active_app = get_mapped_app()
+        macro = (
+            self.mappings.get(active_app, {}).get(gesture_name, {}).get("macro")
+            or
+            self.mappings.get("Global", {}).get(gesture_name, {}).get("macro")
+        )
+        if macro:
+            macro_runner.run_macro(macro)
+       
+
+
 
     def _on_event(self, msg):
+        pass
         print(f"[DEBUG] received: {repr(msg)}")
         if "_DOWN" in msg:
             gesture = msg.replace("_DOWN", "").strip()
@@ -640,6 +663,7 @@ class GesturePuckApp:
         self._render_page(self.current_page)
 
     def _add_new_gesture(self, app_name):
+        pass
         existing = self.mappings.get(app_name, {})
         i, name = len(existing) + 1, ""
         while not name or name in existing:
