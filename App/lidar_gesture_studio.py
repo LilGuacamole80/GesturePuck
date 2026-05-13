@@ -2792,11 +2792,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return p
 
 
-def main() -> int:
-    args = build_arg_parser().parse_args()
-    if not args.demo and not args.port:
-        raise SystemExit("Provide --port /dev/cu.usbmodem2101, or use --demo")
-
+def configure_runtime_args(args: argparse.Namespace) -> argparse.Namespace:
+    """Apply the same runtime defaults for CLI, UI, and embedded engine use."""
     if args.baud is None:
         args.baud = 115200 if args.dual else 921600
     if args.calibration_frames is None:
@@ -2812,6 +2809,15 @@ def main() -> int:
             args.min_mm = 0
         if args.min_track_z_mm == 75.0:
             args.min_track_z_mm = 1.0
+    return args
+
+
+def main() -> int:
+    args = build_arg_parser().parse_args()
+    if not args.demo and not args.port:
+        raise SystemExit("Provide --port /dev/cu.usbmodem2101, or use --demo")
+
+    configure_runtime_args(args)
 
     serial_debug_path = resolve_serial_debug_path(args.serial_debug_log)
     serial_debug = SerialDebugLogger(

@@ -1,12 +1,13 @@
+import glob
 import queue
+import subprocess
+import sys
 import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
+
 from pynput import keyboard as pynput_kb
-from engine.active_app import get_mapped_app
-import subprocess
-import sys
-import ctypes
+
 from engine.active_app import get_mapped_app
 from engine.gesture_engine import GestureEngine
 
@@ -149,6 +150,20 @@ def mk_label(parent, text, fg=TEXT_DIM, font=FONT_LABEL, bg=BG, **kw):
     return tk.Label(parent, text=text, bg=bg, fg=fg, font=font, **kw)
 
 
+def default_serial_port():
+    if sys.platform == "darwin":
+        for pattern in (
+            "/dev/cu.usbserial*",
+            "/dev/cu.usbmodem*",
+            "/dev/tty.usbserial*",
+            "/dev/tty.usbmodem*",
+        ):
+            ports = sorted(glob.glob(pattern))
+            if ports:
+                return ports[0]
+        return "/dev/cu.usbserial-0001"
+    return ""
+
 
 def check_macos_permissions():
     """Checks and prompts for required macOS permissions on first launch"""
@@ -242,18 +257,35 @@ class GlobalKeyRecorder:
 
 # ── MAIN APP ───────────────────────────────────────────────────────────────────
 class GesturePuckApp:
-    def __init__(self, root):
+    def __init__(
+        self,
+        root,
+        *,
+        default_port=None,
+        auto_connect=False,
+        demo=False,
+        baud=115200,
+        serial_debug=False,
+        serial_debug_log=None,
+        serial_debug_bytes=False,
+    ):
         self.root = root
         self.root.title("GesturePuck")
         sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
         self.root.geometry(f"{sw}x{sh}")
         self.root.configure(bg=BG)
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self.mappings     = store.load()
         self.devices      = []
         self.connection   = None
         self.current_page = "Global"
-        self.engine       = None          # ← add this
+        self.engine       = None
+        self.default_port = default_port or default_serial_port()
+        self.baud = baud
+        self.serial_debug = serial_debug
+        self.serial_debug_log = serial_debug_log
+        self.serial_debug_bytes = serial_debug_bytes
 
         self._macro_vars: dict[str, tk.StringVar] = {}
         self._label_vars: dict[str, tk.StringVar] = {}
@@ -269,6 +301,8 @@ class GesturePuckApp:
         self._build_ui()
         self._show_page("Global")
         self.root.after(50, self._poll_recorder)
+        if auto_connect:
+            self.root.after(150, self._connect_demo if demo else self._connect)
 
         
 
@@ -308,14 +342,15 @@ class GesturePuckApp:
         devrow.pack(fill="x", padx=20, pady=8)
 
         mk_label(devrow, "PORT", fg=TEXT_DIM).pack(side="left", padx=(0, 8))
-        self.port_var = tk.StringVar(value="/dev/cu.usbmodem2101")
+        self.port_var = tk.StringVar(value=self.default_port)
         tk.Entry(devrow, textvariable=self.port_var, bg=SURFACE, fg=TEXT,
          insertbackground=ACCENT, relief="flat", width=24, font=FONT_MONO,
          highlightthickness=1, highlightbackground=BORDER,
          highlightcolor=ACCENT).pack(side="left", padx=(0, 8), ipady=3)
 
-       # mk_btn(devrow, "CONNECT", self._connect, bg=ACCENT, fg=BG).pack(side="left", padx=(0, 8))
+        mk_btn(devrow, "CONNECT", self._connect, bg=ACCENT, fg=BG).pack(side="left", padx=(0, 8))
         mk_btn(devrow, "DEMO",    self._connect_demo, bg=SURFACE2, fg=TEXT_MED).pack(side="left")
+        mk_label(devrow, f"DUAL PARSER · {self.baud}", fg=TEXT_DIM).pack(side="left", padx=(10, 0))
 
         # gesture pill
         gf = tk.Frame(devrow, bg=BG)
@@ -538,18 +573,27 @@ class GesturePuckApp:
         def task():
             try:
                 eng = GestureEngine(
-                port=port or "",
-                on_gesture=self._on_gesture_event,
-                demo=demo,
+                    port=port or "",
+                    on_gesture=self._on_gesture_event,
+                    demo=demo,
+                    dual=True,
+                    baud=self.baud,
+                    serial_debug=self.serial_debug,
+                    serial_debug_log=self.serial_debug_log,
+                    serial_debug_bytes=self.serial_debug_bytes,
+                    on_status=self._on_engine_status,
                 )
                 eng.start()
                 self.engine = eng
-                self.root.after(0, lambda: self._set_status(
-                "DEMO" if demo else "CONNECTED", ACCENT))
+                if demo:
+                    self.root.after(0, lambda: self._set_status("DEMO", ACCENT))
             except Exception as exc:
+                message = str(exc)
                 self.root.after(0, lambda: self._set_status("ERROR", REC_CLR))
-                self.root.after(0, lambda: messagebox.showerror(
-                "Connection failed", str(exc)))
+                self.root.after(
+                    0,
+                    lambda msg=message: messagebox.showerror("Connection failed", msg),
+                )
         threading.Thread(target=task, daemon=True).start()
 
     def _set_status(self, text, color):
@@ -559,6 +603,16 @@ class GesturePuckApp:
             REC_CLR if color == REC_CLR else TEXT_DIM)
         self._status_dot.delete("all")
         self._status_dot.create_oval(0, 0, 8, 8, fill=dot_color, outline="")
+
+    def _on_engine_status(self, text):
+        color = ACCENT if text == "RECEIVING FRAMES" else TEXT_MED
+        self.root.after(0, lambda: self._set_status(text, color))
+
+    def _on_close(self):
+        if self.engine is not None:
+            self.engine.stop()
+            self.engine = None
+        self.root.destroy()
 
     # ── EVENTS ────────────────────────────────────────────────────────────────
     def _on_gesture_event(self, gesture_name: str, confidence: float):

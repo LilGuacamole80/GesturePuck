@@ -2,8 +2,8 @@
 GestureEngine — connects the ESP32 dual-sensor serial stream to the
 gesture-classification pipeline and fires on_gesture() callbacks.
 
-Real hardware  : DualSensorSerialFrameSource  (MLD1 + MLD2 binary packets,
-                 #PROX proximity lines)
+Real hardware  : DualSensorSerialFrameSource  (#PROX proximity lines plus
+                 FRAME/FRAME1 CSV or MLD1/MLD2 binary packets)
 Demo mode      : DemoFrameSource  (synthetic sine-wave sweep)
 """
 
@@ -12,10 +12,14 @@ import time
 
 from lidar_gesture_studio import (
     DualSensorSerialFrameSource,
+    SerialFrameSource,
     SignalPipeline,
     StrokeGestureDetector,
     DemoFrameSource,
+    SerialDebugLogger,
     build_arg_parser,
+    configure_runtime_args,
+    resolve_serial_debug_path,
 )
 
 
@@ -35,23 +39,62 @@ class GestureEngine:
         If True, use the synthetic DemoFrameSource instead of real hardware.
     """
 
-    def __init__(self, port: str, on_gesture, demo: bool = False):
+    def __init__(
+        self,
+        port: str,
+        on_gesture,
+        demo: bool = False,
+        *,
+        dual: bool = True,
+        baud: int | None = None,
+        serial_debug: bool = False,
+        serial_debug_log: str | None = None,
+        serial_debug_bytes: bool = False,
+        on_status=None,
+    ):
         self.on_gesture = on_gesture
+        self.on_status = on_status
         self._stop = threading.Event()
+        self.frames_seen = 0
 
         # Build default args (no CLI parsing needed)
         self.args = build_arg_parser().parse_args([])
+        self.args.demo = demo
+        self.args.dual = bool(dual and not demo)
+        self.args.port = port or None
+        self.args.baud = baud
+        self.args.serial_debug = serial_debug
+        self.args.serial_debug_log = serial_debug_log
+        self.args.serial_debug_bytes = serial_debug_bytes
+        configure_runtime_args(self.args)
+
+        serial_debug_path = resolve_serial_debug_path(self.args.serial_debug_log)
+        self.serial_debug = SerialDebugLogger(
+            enabled=self.args.serial_debug,
+            path=serial_debug_path,
+            log_reads=self.args.serial_debug_bytes,
+        )
 
         if demo:
             # Demo: synthetic single-sensor sweep, no calibration delay
-            self.args.calibration_frames = 0
             self.source = DemoFrameSource(max_mm=self.args.max_mm)
             self._dual = False
-        else:
-            # Real hardware: dual ToF + APDS proximity gate
-            self.args.port = port
-            self.source = DualSensorSerialFrameSource(port, self.args.baud)
+        elif self.args.dual:
+            # Current firmware uses the dual parser even during one-ToF bring-up:
+            # APDS #PROX lines plus FRAME/FRAME1 CSV from ToF #1.
+            self.source = DualSensorSerialFrameSource(
+                port,
+                self.args.baud,
+                serial_debug=self.serial_debug,
+            )
             self._dual = True
+        else:
+            self.source = SerialFrameSource(
+                port,
+                self.args.baud,
+                serial_debug=self.serial_debug,
+            )
+            self._dual = False
 
         self.pipeline = SignalPipeline(self.args)
         self.detector = StrokeGestureDetector(self.args)
@@ -66,10 +109,18 @@ class GestureEngine:
     def stop(self) -> None:
         self._stop.set()
         self.source.close()
+        self.serial_debug.close()
+        if self._thread.is_alive():
+            self._thread.join(timeout=0.5)
 
     # ── Internal loop ─────────────────────────────────────────────────────────
 
+    def _emit_status(self, text: str) -> None:
+        if self.on_status is not None:
+            self.on_status(text)
+
     def _loop(self) -> None:
+        self._emit_status("WAITING FOR FRAMES")
         while not self._stop.is_set():
             raw = self.source.read_latest()
 
@@ -83,6 +134,10 @@ class GestureEngine:
                 packet = raw.to_frame_packet()
             else:
                 packet = raw   # DemoFrameSource already returns a FramePacket
+
+            self.frames_seen += 1
+            if self.frames_seen == 1:
+                self._emit_status("RECEIVING FRAMES")
 
             measurement = self.pipeline.process(packet)
             event = self.detector.update(measurement)
