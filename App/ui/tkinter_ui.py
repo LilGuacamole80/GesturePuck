@@ -13,6 +13,13 @@ from pynput import keyboard as pynput_kb
 
 from engine.active_app import get_mapped_app
 from engine.gesture_engine import GestureEngine
+from lidar_gesture_studio import (
+    SignalPipeline,
+    StrokeGestureDetector,
+    build_arg_parser,
+    configure_runtime_args,
+    parse_frame_line,
+)
 
 
 APP_DIR = Path(__file__).resolve().parents[1]
@@ -69,7 +76,7 @@ class UiLogger:
 try:
     import engine.mappings as store
     import engine.macro_runner as macro_runner
-    #import engine.bluetooth_spp as bluetooth_spp
+    import engine.bluetooth_spp as bluetooth_spp
 except ImportError:
     class _Store:
         _data: dict = {}
@@ -88,25 +95,25 @@ except ImportError:
         @staticmethod
         def list_devices(): return []
         @staticmethod
-        def connect(addr, cb): return None
+        def connect(addr, cb, on_status=None): return None
     bluetooth_spp = _BT
 
 
 # ── PALETTE ────────────────────────────────────────────────────────────────────
-BG          = "#080808"   # near-black background
-SURFACE     = "#111111"   # card / sidebar surface
-SURFACE2    = "#1a1a1a"   # slightly lighter surface (hover, row alt)
-BORDER      = "#222222"   # hairline borders
-ACCENT      = "#2BC2F0"   # cyan — primary accent
-ACCENT2     = "#da29e7"   # purple — secondary accent
-ACCENT_DIM  = "#1a7a9a"   # dimmed cyan for active nav
-TEXT        = "#f0f0f0"   # primary text
-TEXT_DIM    = "#555555"   # muted / label text
-TEXT_MED    = "#999999"   # medium text
-MACRO_CLR   = "#a78bfa"   # soft purple for macro values
-REC_CLR     = "#f87171"   # soft red for recording state
-SAVE_CLR    = "#34d399"   # soft green for save button
-DEL_CLR     = "#f87171"   # soft red for delete
+BG          = "#080808"
+SURFACE     = "#111111"
+SURFACE2    = "#1a1a1a"
+BORDER      = "#222222"
+ACCENT      = "#2BC2F0"
+ACCENT2     = "#da29e7"
+ACCENT_DIM  = "#1a7a9a"
+TEXT        = "#f0f0f0"
+TEXT_DIM    = "#555555"
+TEXT_MED    = "#999999"
+MACRO_CLR   = "#a78bfa"
+REC_CLR     = "#f87171"
+SAVE_CLR    = "#34d399"
+DEL_CLR     = "#f87171"
 
 # ── FONTS ──────────────────────────────────────────────────────────────────────
 FONT_MONO   = ("Courier New", 10)
@@ -233,17 +240,53 @@ def mk_label(parent, text, fg=TEXT_DIM, font=FONT_LABEL, bg=BG, **kw):
     return tk.Label(parent, text=text, bg=bg, fg=fg, font=font, **kw)
 
 
+def list_serial_devices():
+    """Return [(port, display_label), ...] for USB serial devices.
+
+    Uses pyserial when available so Windows shows COM descriptions, then
+    falls back to glob patterns for macOS/Linux.
+    """
+    devices = []
+    try:
+        from serial.tools import list_ports
+        for p in list_ports.comports():
+            port = getattr(p, "device", "") or ""
+            desc = getattr(p, "description", "") or ""
+            hwid = getattr(p, "hwid", "") or ""
+            if not port:
+                continue
+            detail = desc if desc and desc != "n/a" else hwid
+            label = f"{port} · {detail}" if detail else port
+            devices.append((port, label))
+    except Exception:
+        pass
+
+    if not devices:
+        patterns = [
+            "/dev/cu.usbmodem*", "/dev/cu.usbserial*", "/dev/tty.usbmodem*", "/dev/tty.usbserial*",
+            "/dev/ttyACM*", "/dev/ttyUSB*", "COM*",
+        ]
+        seen = set()
+        for pattern in patterns:
+            try:
+                for port in sorted(glob.glob(pattern)):
+                    if port not in seen:
+                        seen.add(port)
+                        devices.append((port, port))
+            except Exception:
+                pass
+    return devices
+
+
 def default_serial_port():
+    devices = list_serial_devices()
+    if devices:
+        # Prefer COM5 on your Windows setup when it exists; otherwise use first detected port.
+        for port, _label in devices:
+            if port.upper() == "COM5":
+                return port
+        return devices[0][0]
     if sys.platform == "darwin":
-        for pattern in (
-            "/dev/cu.usbserial*",
-            "/dev/cu.usbmodem*",
-            "/dev/tty.usbserial*",
-            "/dev/tty.usbmodem*",
-        ):
-            ports = sorted(glob.glob(pattern))
-            if ports:
-                return ports[0]
         return "/dev/cu.usbserial-0001"
     return ""
 
@@ -252,8 +295,6 @@ def check_macos_permissions(logger=None):
     """Checks and prompts for required macOS permissions on first launch"""
     if sys.platform != "darwin":
         return
-    
-    # Check if we have accessibility access
     if logger is not None:
         logger.log("permissions_check", "checking macOS Accessibility")
     try:
@@ -270,9 +311,8 @@ def check_macos_permissions(logger=None):
     if logger is not None:
         stderr = result.stderr.decode("utf-8", errors="replace").strip()
         logger.log("permissions_check", f"returncode={result.returncode} stderr={stderr!r}")
-    
+
     if result.returncode != 0:
-        # No accessibility permission — show instructions
         import tkinter.messagebox as mb
         mb.showwarning(
             "Permission Required",
@@ -282,9 +322,8 @@ def check_macos_permissions(logger=None):
             "System Settings → Privacy & Security\n\n"
             "Enable GesturePuck or Terminal/Python under Accessibility and Input Monitoring, then restart the app."
         )
-        # Open the right settings page automatically
         subprocess.run([
-            "open", 
+            "open",
             "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
         ])
 
@@ -392,6 +431,110 @@ class GlobalKeyRecorder:
             self._log_exception("recorder_key_release_error", exc)
 
 
+# ── BLE SCAN DIALOG ────────────────────────────────────────────────────────────
+class BleScanDialog(tk.Toplevel):
+    """
+    Modal dialog that scans for BLE devices and lets the user pick one.
+    On confirm it writes the chosen address into port_var with the
+    special prefix  "BLE:"  so the engine knows to use BLE instead of serial.
+    """
+    def __init__(self, parent, port_var, logger=None):
+        super().__init__(parent)
+        self.port_var = port_var
+        self.logger   = logger
+        self._devices: list[tuple[str, str]] = []   # (address, name)
+
+        self.title("Scan for BLE Devices")
+        self.configure(bg=BG)
+        self.resizable(False, False)
+        self.grab_set()
+
+        # ── header
+        tk.Label(self, text="BLE DEVICE SCANNER", bg=BG, fg=ACCENT,
+                 font=FONT_TITLE).pack(pady=(16, 4))
+        tk.Label(self, text="GesturePuck devices shown first",
+                 bg=BG, fg=TEXT_DIM, font=FONT_LABEL).pack()
+
+        mk_separator(self, BORDER).pack(fill="x", padx=16, pady=8)
+
+        # ── listbox
+        list_frame = tk.Frame(self, bg=BG)
+        list_frame.pack(fill="both", expand=True, padx=16)
+
+        self._lb = tk.Listbox(
+            list_frame, bg=SURFACE, fg=TEXT, selectbackground=ACCENT_DIM,
+            selectforeground=TEXT, font=FONT_MONO, width=52, height=10,
+            relief="flat", highlightthickness=1,
+            highlightbackground=BORDER, highlightcolor=ACCENT,
+            activestyle="none",
+        )
+        lb_sb = ttk.Scrollbar(list_frame, orient="vertical",
+                              command=self._lb.yview)
+        self._lb.configure(yscrollcommand=lb_sb.set)
+        lb_sb.pack(side="right", fill="y")
+        self._lb.pack(side="left", fill="both", expand=True)
+
+        # ── status label
+        self._scan_status = tk.StringVar(value="Press SCAN to search for devices")
+        tk.Label(self, textvariable=self._scan_status, bg=BG, fg=TEXT_MED,
+                 font=FONT_LABEL).pack(pady=(6, 2))
+
+        # ── buttons
+        btn_row = tk.Frame(self, bg=BG)
+        btn_row.pack(pady=(4, 16))
+        mk_btn(btn_row, "⟳  SCAN",   self._do_scan,   bg=ACCENT,   fg=BG    ).pack(side="left", padx=4)
+        mk_btn(btn_row, "✓  SELECT", self._do_select, bg=SAVE_CLR, fg=BG    ).pack(side="left", padx=4)
+        mk_btn(btn_row, "✕  CANCEL", self.destroy,    bg=SURFACE,  fg=DEL_CLR).pack(side="left", padx=4)
+
+        self.geometry(f"+{parent.winfo_rootx()+80}+{parent.winfo_rooty()+80}")
+
+    def _do_scan(self):
+        self._scan_status.set("Scanning… (5 s)")
+        self._lb.delete(0, tk.END)
+        self._devices = []
+        if self.logger:
+            self.logger.log("ble_scan", "starting BLE scan")
+
+        def task():
+            devs = bluetooth_spp.list_devices()
+            self.after(0, lambda: self._populate(devs))
+
+        threading.Thread(target=task, daemon=True).start()
+
+    def _populate(self, devices: list[tuple[str, str]]):
+        self._devices = devices
+        self._lb.delete(0, tk.END)
+        if not devices:
+            self._scan_status.set("No devices found")
+            if self.logger:
+                self.logger.log("ble_scan", "no devices found")
+            return
+        for addr, name in devices:
+            marker = "★ " if "GesturePuck" in name else "  "
+            self._lb.insert(tk.END, f"{marker}{name}   [{addr}]")
+        # auto-select first GesturePuck
+        for i, (_, name) in enumerate(devices):
+            if "GesturePuck" in name:
+                self._lb.selection_set(i)
+                self._lb.see(i)
+                break
+        self._scan_status.set(f"{len(devices)} device(s) found")
+        if self.logger:
+            self.logger.log("ble_scan", f"found {len(devices)} device(s)")
+
+    def _do_select(self):
+        sel = self._lb.curselection()
+        if not sel:
+            messagebox.showwarning("No Selection", "Select a device first.", parent=self)
+            return
+        addr, name = self._devices[sel[0]]
+        # Write "BLE:<address>" into the port field so the engine uses BLE
+        self.port_var.set(f"BLE:{addr}")
+        if self.logger:
+            self.logger.log("ble_select", f"selected name={name!r} addr={addr!r}")
+        self.destroy()
+
+
 # ── MAIN APP ───────────────────────────────────────────────────────────────────
 class GesturePuckApp:
     def __init__(
@@ -421,7 +564,7 @@ class GesturePuckApp:
 
         self.mappings     = store.load()
         self.devices      = []
-        self.connection   = None
+        self.connection   = None        # BLE connection handle (if connected via BLE)
         self.current_page = "Global"
         self.engine       = None
         self.default_port = default_port or default_serial_port()
@@ -429,6 +572,24 @@ class GesturePuckApp:
         self.serial_debug = serial_debug
         self.serial_debug_log = serial_debug_log
         self.serial_debug_bytes = serial_debug_bytes
+
+        # BLE UART receives the same text stream as Serial Monitor.
+        # These fields let BLE feed FRAME lines into the same classifier path.
+        self._ble_pipeline = None
+        self._ble_detector = None
+        self._ble_frames_seen = 0
+        self._ble_lines_seen = 0
+        self._ble_prox_seen = 0
+        self._ble_last_proximity = 0
+        self._ble_last_hand_present = False
+        self._ble_connected = False
+        self._ble_last_visible = False
+        self._ble_last_quality = 0.0
+        self._ble_last_measurement_status = ""
+        self._ble_is_calibrating = False
+        self._serial_is_calibrating = False
+        self._ready_token = 0
+        self._ble_state_lock = threading.RLock()
 
         self._macro_vars: dict[str, tk.StringVar] = {}
         self._label_vars: dict[str, tk.StringVar] = {}
@@ -444,7 +605,10 @@ class GesturePuckApp:
         self.recorder     = GlobalKeyRecorder(self.logger)
         self.status       = tk.StringVar(value="NOT CONNECTED")
         self.last_gesture = tk.StringVar(value="—")
-        self.device_var   = tk.StringVar()
+        self.device_var   = tk.StringVar(value=self.default_port)
+        self.connection_type_var = tk.StringVar(value="Direct")
+        self._device_display_to_value: dict[str, str] = {}
+        self._serial_calibrating_until = 0.0
 
         self._build_ui()
         self.root.bind_all("<KeyPress>", self._on_local_key_press, add="+")
@@ -455,8 +619,6 @@ class GesturePuckApp:
         if auto_connect:
             self.root.after(150, self._connect_demo if demo else self._connect)
 
-        
-
     # ── BUILD ──────────────────────────────────────────────────────────────────
     def _build_ui(self):
         # ── TOP BAR ───────────────────────────────────────────────────────────
@@ -464,7 +626,6 @@ class GesturePuckApp:
         topbar.pack(fill="x")
         topbar.pack_propagate(False)
 
-        # logo dot + wordmark
         logo_area = tk.Frame(topbar, bg=SURFACE)
         logo_area.pack(side="left", padx=(20, 0))
 
@@ -477,7 +638,6 @@ class GesturePuckApp:
                  font=("Courier New", 12, "bold"),
                  ).pack(side="left")
 
-        # status pill
         pill = tk.Frame(topbar, bg=SURFACE)
         pill.pack(side="right", padx=20)
         self._status_dot = tk.Canvas(pill, width=8, height=8,
@@ -492,17 +652,47 @@ class GesturePuckApp:
         devrow = tk.Frame(self.root, bg=BG)
         devrow.pack(fill="x", padx=20, pady=8)
 
-        mk_label(devrow, "PORT", fg=TEXT_DIM).pack(side="left", padx=(0, 8))
-        self.port_var = tk.StringVar(value=self.default_port)
-        tk.Entry(devrow, textvariable=self.port_var, bg=SURFACE, fg=TEXT,
-         insertbackground=ACCENT, relief="flat", width=24, font=FONT_MONO,
-         highlightthickness=1, highlightbackground=BORDER,
-         highlightcolor=ACCENT).pack(side="left", padx=(0, 8), ipady=3)
+        # --- Unified connection section: Direct USB/COM or Bluetooth BLE ---
+        mk_label(devrow, "CONNECT BY", fg=TEXT_DIM).pack(side="left", padx=(0, 8))
+        self._conn_type_combo = ttk.Combobox(
+            devrow,
+            textvariable=self.connection_type_var,
+            values=("Direct", "Bluetooth"),
+            state="readonly",
+            width=10,
+            font=FONT_MONO,
+        )
+        self._conn_type_combo.pack(side="left", padx=(0, 8), ipady=2)
+        self._conn_type_combo.bind("<<ComboboxSelected>>", self._on_connection_type_changed)
 
-        mk_btn(devrow, "CONNECT", self._connect, bg=ACCENT, fg=BG).pack(side="left", padx=(0, 8))
+        mk_label(devrow, "DEVICE", fg=TEXT_DIM).pack(side="left", padx=(0, 8))
+        self.port_var = tk.StringVar(value=self.default_port)  # raw value: COM5 or BLE:<addr>
+        self._device_combo = ttk.Combobox(
+            devrow,
+            textvariable=self.device_var,
+            values=(),
+            state="normal",
+            width=36,
+            font=FONT_MONO,
+        )
+        self._device_combo.pack(side="left", padx=(0, 8), ipady=2)
+        self._device_combo.bind("<<ComboboxSelected>>", self._on_device_selected)
+
+        mk_btn(devrow, "SCAN", self._scan_devices, bg=ACCENT2, fg=BG).pack(side="left", padx=(0, 4))
+        mk_btn(devrow, "CONNECT", self._connect, bg=ACCENT, fg=BG).pack(side="left", padx=(0, 4))
+
         mk_btn(devrow, "DEMO",    self._connect_demo, bg=SURFACE2, fg=TEXT_MED).pack(side="left")
         mk_btn(devrow, "RECALIBRATE", self._recalibrate, bg=SURFACE2, fg=ACCENT).pack(side="left", padx=(8, 0))
-        mk_label(devrow, f"DUAL PARSER · {self.baud}", fg=TEXT_DIM).pack(side="left", padx=(10, 0))
+
+        # Connection-mode indicator (updates dynamically)
+        self._conn_mode_var = tk.StringVar(value="")
+        self._conn_mode_lbl = tk.Label(
+            devrow, textvariable=self._conn_mode_var,
+            bg=BG, fg=TEXT_DIM, font=FONT_LABEL,
+        )
+        self._conn_mode_lbl.pack(side="left", padx=(10, 0))
+
+        mk_label(devrow, f"· {self.baud}", fg=TEXT_DIM).pack(side="left", padx=(4, 0))
 
         # gesture pill
         gf = tk.Frame(devrow, bg=BG)
@@ -522,7 +712,6 @@ class GesturePuckApp:
         body = tk.Frame(self.root, bg=BG)
         body.pack(fill="both", expand=True)
 
-        # sidebar
         sidebar = tk.Frame(body, bg=SURFACE, width=200)
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
@@ -550,7 +739,6 @@ class GesturePuckApp:
             b.pack(fill="x")
             self._nav_btns[app] = b
 
-            # hover effect
             def _enter(e, btn=b):
                 if btn.cget("bg") != ACCENT_DIM:
                     btn.config(bg=SURFACE2, fg=TEXT)
@@ -562,10 +750,8 @@ class GesturePuckApp:
             b.bind("<Enter>", _enter)
             b.bind("<Leave>", _leave)
 
-        # right separator
         tk.Frame(body, bg=BORDER, width=1).pack(side="left", fill="y")
 
-        # scrollable content
         content_outer = tk.Frame(body, bg=BG)
         content_outer.pack(side="left", fill="both", expand=True)
 
@@ -588,6 +774,12 @@ class GesturePuckApp:
             "<Configure>",
             lambda e: self.canvas.itemconfig(self._cwin, width=e.width))
 
+    # ── BLE SCAN DIALOG ────────────────────────────────────────────────────────
+    def _open_ble_scan(self):
+        """Open the BLE scan dialog. On device selection, port_var is set to BLE:<addr>."""
+        self.logger.log("ble_scan_open", "opening BLE scan dialog")
+        BleScanDialog(self.root, self.port_var, self.logger)
+
     # ── NAVIGATION ────────────────────────────────────────────────────────────
     def _show_page(self, app_name):
         self.logger.log("nav", f"show_page={app_name}")
@@ -600,7 +792,6 @@ class GesturePuckApp:
         self._render_page(app_name)
 
     # ── RENDER ────────────────────────────────────────────────────────────────
-
     def _render_page(self, app_name):
         self.logger.log("render", f"page={app_name} mappings={len(self.mappings.get(app_name, {}))}")
         for w in self.content_frame.winfo_children():
@@ -634,18 +825,15 @@ class GesturePuckApp:
             self._add_row(gesture, data.get("label", gesture),
                       data.get("macro", ""), alt=(i % 2 == 1))
 
-
     def _add_row(self, gesture, label, macro, alt=False):
         row_bg = SURFACE2 if alt else SURFACE
         row = tk.Frame(self.content_frame, bg=row_bg)
         row.pack(fill="x", padx=24, pady=1)
 
-        # gesture name badge
         badge = tk.Label(row, text=gesture, bg=ACCENT_DIM, fg=TEXT,
                          font=FONT_BADGE, padx=6, pady=2, width=16, anchor="w")
         badge.pack(side="left", padx=(8, 12), pady=6)
 
-        # label entry
         lvar = tk.StringVar(value=label)
         self._label_vars[gesture] = lvar
         label_entry = tk.Entry(
@@ -658,7 +846,6 @@ class GesturePuckApp:
         )
         label_entry.pack(side="left", padx=(0, 8), ipady=3)
 
-        # macro entry
         mvar = tk.StringVar(value=macro)
         self._macro_vars[gesture] = mvar
         entry = tk.Entry(
@@ -672,7 +859,6 @@ class GesturePuckApp:
         entry.pack(side="left", padx=(0, 12), ipady=3)
         self._entries[gesture] = entry
 
-        # action buttons
         mk_btn(row, "⏺  REC",
                lambda g=gesture: self._start_record(g),
                bg=SURFACE, fg=REC_CLR).pack(side="left", padx=(0, 4))
@@ -687,59 +873,386 @@ class GesturePuckApp:
                bg=SURFACE, fg=DEL_CLR).pack(side="left", padx=(0, 8))
 
     # ── DEVICE / CONNECT ──────────────────────────────────────────────────────
+    def _on_connection_type_changed(self, event=None):
+        mode = self.connection_type_var.get()
+        self._device_display_to_value.clear()
+        self._device_combo.configure(values=())
+        if mode == "Direct":
+            self.port_var.set(self.default_port or "")
+            self.device_var.set(self.default_port or "")
+            self._conn_mode_var.set("MODE · DIRECT USB")
+            self._conn_mode_lbl.config(fg=ACCENT)
+        else:
+            self.port_var.set("")
+            self.device_var.set("Press SCAN to find GesturePuck")
+            self._conn_mode_var.set("MODE · BLUETOOTH")
+            self._conn_mode_lbl.config(fg=ACCENT2)
+
+    def _on_device_selected(self, event=None):
+        shown = self.device_var.get().strip()
+        raw = self._device_display_to_value.get(shown, shown)
+        self.port_var.set(raw)
+        self.logger.log("device_select", f"shown={shown!r} raw={raw!r}")
+
+    def _resolve_selected_device_value(self) -> str:
+        shown = self.device_var.get().strip()
+        raw = self._device_display_to_value.get(shown, shown).strip()
+        mode = self.connection_type_var.get()
+
+        if mode == "Bluetooth":
+            if raw.upper().startswith("BLE:"):
+                return raw
+            # Allow pasting just the BLE address into the box.
+            if raw and ":" in raw and not raw.upper().startswith("COM"):
+                return f"BLE:{raw}"
+            return raw
+
+        # Direct mode: if user typed a friendly label like "COM5 · USB Serial",
+        # keep only the actual port before the separator.
+        if " · " in raw:
+            raw = raw.split(" · ", 1)[0].strip()
+        return raw
+
     def _scan_devices(self):
-        pass
-        self._set_status("SCANNING…", TEXT_DIM)
+        mode = self.connection_type_var.get()
+        self._set_status("Scanning…", TEXT_DIM)
+        self.logger.log("scan", f"mode={mode!r}")
+
         def task():
-            devs = bluetooth_spp.list_devices()
-            self.root.after(0, lambda: self._update_devices(devs))
+            if mode == "Bluetooth":
+                devices = bluetooth_spp.list_devices()
+                self.root.after(0, lambda: self._update_scanned_devices("Bluetooth", devices))
+            else:
+                devices = list_serial_devices()
+                self.root.after(0, lambda: self._update_scanned_devices("Direct", devices))
+
         threading.Thread(target=task, daemon=True).start()
 
-    def _update_devices(self, devices):
-        pass
+    def _update_scanned_devices(self, mode, devices):
         self.devices = devices
-        names = [n for _, n in devices]
-        self.combo["values"] = names
-        if names:
-            self.combo.current(0)
-            self._set_status("DEVICES FOUND", TEXT_MED)
+        self._device_display_to_value.clear()
+
+        if mode == "Bluetooth":
+            # Strongly prefer the advertised name GesturePuck. Other BLE devices
+            # are still shown below it for debugging.
+            pucks = [(addr, name) for addr, name in devices if "GesturePuck" in (name or "")]
+            ordered = pucks + [(addr, name) for addr, name in devices if (addr, name) not in pucks]
+            labels = []
+            for addr, name in ordered:
+                shown_name = name or addr
+                label = f"{shown_name} · {addr}"
+                self._device_display_to_value[label] = f"BLE:{addr}"
+                labels.append(label)
+            self._device_combo.configure(values=labels)
+            if labels:
+                chosen = labels[0]
+                self.device_var.set(chosen)
+                self.port_var.set(self._device_display_to_value[chosen])
+                self._set_status("Not Connected", TEXT_MED)
+                self.logger.log("ble_scan", f"found={len(devices)} selected={chosen!r}")
+            else:
+                self.device_var.set("No BLE devices found")
+                self.port_var.set("")
+                self._set_status("Not Connected", TEXT_DIM)
+                self.logger.log("ble_scan", "no devices found")
+            return
+
+        labels = []
+        for port, label in devices:
+            self._device_display_to_value[label] = port
+            labels.append(label)
+        self._device_combo.configure(values=labels)
+        if labels:
+            # Prefer COM5 when available because that is your usual GesturePuck
+            # direct port; otherwise choose the first detected port.
+            chosen = next((label for port, label in devices if port.upper() == "COM5"), labels[0])
+            self.device_var.set(chosen)
+            self.port_var.set(self._device_display_to_value[chosen])
+            self._set_status("Not Connected", TEXT_MED)
+            self.logger.log("serial_scan", f"found={len(devices)} selected={chosen!r}")
         else:
-            self._set_status("NO DEVICES", TEXT_DIM)
+            self.device_var.set("No serial ports found")
+            self.port_var.set("")
+            self._set_status("Not Connected", TEXT_DIM)
+            self.logger.log("serial_scan", "no serial ports found")
 
     def _connect(self):
-        port = self.port_var.get().strip()
-        self.logger.log("connect_click", f"port={port!r}")
-        if not port:
-            self.logger.log("connect_error", "empty serial port")
-            messagebox.showerror("Error", "Enter a serial port")
-            return
-        self._start_engine(port=port, demo=False)
+        """Connect using the selected Direct/Bluetooth mode and device."""
+        port_value = self._resolve_selected_device_value()
+        self.port_var.set(port_value)
+        mode = self.connection_type_var.get()
+        self.logger.log("connect_click", f"mode={mode!r} port_value={port_value!r}")
+
+        if mode == "Bluetooth" or port_value.upper().startswith("BLE:"):
+            ble_addr = port_value[4:].strip() if port_value.upper().startswith("BLE:") else port_value.strip()
+            if not ble_addr:
+                messagebox.showerror("Error", "Choose Bluetooth, press SCAN, then select GesturePuck.")
+                return
+            self._start_ble_engine(ble_addr)
+        else:
+            if not port_value:
+                self.logger.log("connect_error", "empty serial port")
+                messagebox.showerror("Error", "Choose Direct, press SCAN, then select a COM/USB port.")
+                return
+            self._start_engine(port=port_value, demo=False)
 
     def _connect_demo(self):
         self.logger.log("connect_demo_click", "starting demo source")
         self._start_engine(port=None, demo=True)
 
     def _recalibrate(self):
-        self.logger.log("recalibrate_click", f"engine_present={self.engine is not None}")
-        if self.engine is None:
-            self._set_status("NOT CONNECTED", TEXT_DIM)
-            messagebox.showinfo("Recalibrate", "Connect to the puck before recalibrating.")
-            return
-        try:
-            self.engine.recalibrate()
-            self._set_status("RECALIBRATED", ACCENT)
-        except Exception as exc:
-            self.logger.exception("recalibrate_exception", exc)
-            self._set_status("RECALIBRATE ERROR", REC_CLR)
-            messagebox.showerror("Recalibrate failed", str(exc))
+        """Recalibrate either the COM/serial engine or the BLE frame classifier."""
+        with self._ble_state_lock:
+            ble_ready = self.connection is not None and self._ble_connected
+        self.logger.log(
+            "recalibrate_click",
+            f"engine_present={self.engine is not None} ble_ready={ble_ready}",
+        )
 
-    def _start_engine(self, port, demo):
-    # Stop any existing engine first
-        if hasattr(self, "engine") and self.engine is not None:
-            self.logger.log("connect", "stopping existing engine before reconnect")
+        # Serial/COM path: the GestureEngine owns the pipeline.
+        if self.engine is not None:
+            try:
+                self._serial_is_calibrating = True
+                self._serial_calibrating_until = time.time() + 0.9
+                self._set_status("Calibrating", ACCENT)
+                self.engine.recalibrate()
+                self._schedule_ready(delay_ms=900)
+            except Exception as exc:
+                self._serial_is_calibrating = False
+                self.logger.exception("recalibrate_exception", exc)
+                self._set_status("Recalibrate Error", REC_CLR)
+                messagebox.showerror("Recalibrate failed", str(exc))
+            return
+
+        # BLE path: BLE does not use GestureEngine, but it still has a
+        # SignalPipeline + StrokeGestureDetector receiving FRAME lines.
+        if ble_ready:
+            try:
+                with self._ble_state_lock:
+                    if self._ble_pipeline is None or self._ble_detector is None:
+                        self._ble_pipeline, self._ble_detector = self._make_ble_classifier()
+                    self._ble_pipeline.start_calibration()
+                    self._ble_detector.clear()
+                    self._ble_is_calibrating = True
+                    self._ble_last_visible = False
+                    self._ble_last_quality = 0.0
+                    self._ble_last_measurement_status = "calibrating"
+                self._set_status("Calibrating", ACCENT2)
+                self._schedule_ready(delay_ms=900)
+            except Exception as exc:
+                with self._ble_state_lock:
+                    self._ble_is_calibrating = False
+                self.logger.exception("ble_recalibrate_exception", exc)
+                self._set_status("Recalibrate Error", REC_CLR)
+                messagebox.showerror("BLE recalibrate failed", str(exc))
+            return
+
+        self._set_status("Not Connected", TEXT_DIM)
+        messagebox.showinfo("Recalibrate", "Connect to the puck before recalibrating.")
+
+    # ── BLE ENGINE ────────────────────────────────────────────────────────────
+    def _make_ble_classifier(self):
+        """Create a fresh copy of the same gesture pipeline used by the serial engine."""
+        args = build_arg_parser().parse_args([])
+        args.demo = False
+        args.dual = True
+        args.port = None
+        args.baud = self.baud
+        args.serial_debug = self.serial_debug
+        args.serial_debug_log = self.serial_debug_log
+        args.serial_debug_bytes = self.serial_debug_bytes
+        configure_runtime_args(args)
+        return SignalPipeline(args), StrokeGestureDetector(args)
+
+    def _start_ble_engine(self, ble_addr: str):
+        """
+        Stop any existing engine/connection, then open a BLE UART connection.
+
+        Important: the ESP32 firmware sends FRAME/#PROX lines over BLE, not only
+        pre-classified GESTURE lines. So BLE needs its own classifier state and
+        must parse FRAME lines exactly like the serial path does.
+        """
+        self._stop_existing_engine()
+        self._connect_generation += 1
+        self.logger.log("ble_connect", f"addr={ble_addr!r}")
+        self._set_status("Connecting…", TEXT_DIM)
+        self.connection_type_var.set("Bluetooth")
+        self._conn_mode_var.set("MODE · BLUETOOTH")
+        self._conn_mode_lbl.config(fg=ACCENT2)
+
+        with self._ble_state_lock:
+            self._ble_pipeline, self._ble_detector = self._make_ble_classifier()
+            self._ble_frames_seen = 0
+            self._ble_lines_seen = 0
+            self._ble_prox_seen = 0
+            self._ble_connected = False
+            self._ble_is_calibrating = False
+            self._ble_connected = False
+            self._ble_last_proximity = 0
+            self._ble_last_hand_present = False
+            self._ble_connected = False
+            self._ble_last_visible = False
+            self._ble_last_quality = 0.0
+            self._ble_last_measurement_status = ""
+            self._ble_is_calibrating = False
+
+        def task():
+            try:
+                conn = bluetooth_spp.connect(
+                    ble_addr,
+                    self._on_ble_line,
+                    on_status=self._on_ble_status,
+                )
+                self.connection = conn
+                self.logger.log("ble_connect", "BLE worker started")
+            except Exception as exc:
+                self.logger.exception("ble_connect_exception", exc)
+                self._ui_events.put(("error", "BLE Connection failed", str(exc)))
+
+        threading.Thread(target=task, daemon=True).start()
+
+    def _on_ble_status(self, text: str):
+        """Status callback from the BLE transport thread."""
+        self.logger.log("ble_status", text)
+        if text == "BLE CONNECTED":
+            with self._ble_state_lock:
+                self._ble_connected = True
+            self._ui_events.put(("status", "Waiting for Frames", TEXT_MED))
+            return
+        if text == "BLE DISCONNECTED" or text.startswith("BLE ERROR"):
+            with self._ble_state_lock:
+                self._ble_connected = False
+                self._ble_is_calibrating = False
+            label = "Disconnected" if text == "BLE DISCONNECTED" else "BLE Error"
+            self._ui_events.put(("status", label, REC_CLR))
+            return
+        if text in {"BLE WAITING FOR FRAMES", "BLE RECEIVING DATA"}:
+            label = "Waiting for Frames" if "WAITING" in text else "Receiving Frames"
+            self._ui_events.put(("status", label, TEXT_MED if "WAITING" in text else ACCENT2))
+            return
+        self._ui_events.put(("status", self._clean_status_text(text), TEXT_MED))
+
+    def _parse_ble_frame_line(self, line: str):
+        """Parse FRAME/FRAME1/FRAME2 from BLE. The classifier uses ToF #1."""
+        if line.startswith("FRAME2,"):
+            # Current classifier only uses the primary ToF frame. Keep ignoring
+            # ToF #2 until the model/classifier is updated for two sensors.
+            return None
+        if line.startswith("FRAME1,"):
+            line = "FRAME," + line.split(",", 1)[1]
+        return parse_frame_line(line)
+
+    def _on_ble_line(self, line: str):
+        """
+        Called by the BLE connection for every text line received from the ESP32.
+        Supported lines:
+          FRAME,<seq>,<ms>,<64 values…>   -> parsed and classified locally
+          FRAME1,<seq>,<ms>,<64 values…>  -> parsed and classified locally
+          FRAME2,<seq>,<ms>,<64 values…>  -> currently ignored by classifier
+          #PROX,<value>,<hand>             -> status/diagnostics
+          GESTURE,<name>,<confidence>     -> optional direct firmware gesture
+        """
+        self.logger.log("ble_line", line[:180])
+        with self._ble_state_lock:
+            self._ble_lines_seen += 1
+
+        if line.startswith("#PROX,"):
+            try:
+                parts = line.split(",")
+                with self._ble_state_lock:
+                    self._ble_last_proximity = int(parts[1])
+                    self._ble_last_hand_present = int(parts[2]) == 1
+                    self._ble_prox_seen += 1
+                    frames_seen = self._ble_frames_seen
+                    hand = self._ble_last_hand_present
+                if frames_seen == 0:
+                    status = "Waiting for Frames" if hand else "Waiting for Hand"
+                    self._ui_events.put(("status", status, TEXT_MED))
+            except (IndexError, ValueError):
+                self.logger.log("ble_bad_prox", line[:120])
+            return
+
+        if line.startswith("GESTURE,"):
+            parts = line.split(",")
+            if len(parts) >= 3:
+                try:
+                    name = parts[1].strip()
+                    confidence = float(parts[2].strip())
+                    self._ui_events.put(("gesture", name, confidence))
+                    self._ui_events.put(("status", "Ready", ACCENT2))
+                except ValueError:
+                    self.logger.log("ble_bad_gesture", line[:120])
+            return
+
+        if not line.startswith(("FRAME,", "FRAME1,", "FRAME2,")):
+            # Keep setup chatter out of the UI, but leave it in the log.
+            return
+
+        packet = self._parse_ble_frame_line(line)
+        if packet is None:
+            return
+
+        try:
+            with self._ble_state_lock:
+                if self._ble_pipeline is None or self._ble_detector is None:
+                    self._ble_pipeline, self._ble_detector = self._make_ble_classifier()
+                self._ble_frames_seen += 1
+                frames_seen = self._ble_frames_seen
+                measurement = self._ble_pipeline.process(packet)
+                event = self._ble_detector.update(measurement)
+
+            # First valid frame means the puck stream is alive. Show loading,
+            # then Ready once the classifier has processed a few frames.
+            with self._ble_state_lock:
+                ble_calibrating = self._ble_is_calibrating
+                measurement_status = getattr(measurement, "status", "")
+                self._ble_last_measurement_status = measurement_status
+                if ble_calibrating and not str(measurement_status).startswith("calibrating"):
+                    self._ble_is_calibrating = False
+                    ble_calibrating = False
+
+            if ble_calibrating:
+                self._ui_events.put(("status", "Calibrating", ACCENT2))
+            elif frames_seen == 1:
+                self._ui_events.put(("status", "Receiving Frames", ACCENT2))
+                self._schedule_ready(delay_ms=900)
+            elif frames_seen % 50 == 0 and self.status.get() != "Ready":
+                self._ui_events.put(("status", "Receiving Frames", ACCENT2))
+                self._schedule_ready(delay_ms=600)
+
+            if event is not None:
+                self.logger.log(
+                    "ble_gesture",
+                    f"name={event.name} confidence={event.confidence:.3f} details={event.details}",
+                )
+                self._ui_events.put(("gesture", event.name, event.confidence))
+        except Exception as exc:
+            self.logger.exception("ble_classifier_exception", exc)
+            self._ui_events.put(("status", f"BLE ERROR {type(exc).__name__}", REC_CLR))
+
+    # ── SERIAL ENGINE ─────────────────────────────────────────────────────────
+    def _stop_existing_engine(self):
+        """Stop whichever transport is currently active."""
+        if self.engine is not None:
+            self.logger.log("connect", "stopping existing serial engine")
             self.engine.stop()
             self.engine = None
+        if self.connection is not None:
+            self.logger.log("connect", "closing existing BLE connection")
+            try:
+                self.connection.close()
+            except Exception:
+                pass
+            self.connection = None
+        with self._ble_state_lock:
+            self._ble_pipeline = None
+            self._ble_detector = None
+            self._ble_frames_seen = 0
+            self._ble_lines_seen = 0
+            self._ble_prox_seen = 0
 
+    def _start_engine(self, port, demo):
+        self._stop_existing_engine()
         self._connect_generation += 1
         generation = self._connect_generation
         self.logger.log(
@@ -747,7 +1260,17 @@ class GesturePuckApp:
             f"generation={generation} demo={demo} port={port!r} baud={self.baud} "
             f"serial_debug={self.serial_debug} serial_debug_log={self.serial_debug_log!r}",
         )
-        self._set_status("CONNECTING…", TEXT_DIM)
+        self._set_status("Connecting…", TEXT_DIM)
+
+        # Update connection-mode label
+        if demo:
+            self._conn_mode_var.set("MODE · DEMO")
+            self._conn_mode_lbl.config(fg=TEXT_MED)
+        else:
+            self.connection_type_var.set("Direct")
+            self._conn_mode_var.set("MODE · DIRECT USB")
+            self._conn_mode_lbl.config(fg=ACCENT)
+
         self.root.after(8000, lambda gen=generation: self._connect_watchdog(gen))
 
         def task():
@@ -786,7 +1309,7 @@ class GesturePuckApp:
                 "connect_watchdog",
                 f"generation={generation} still no engine object; serial open or engine startup may be blocked",
             )
-            self._set_status("CONNECT TIMEOUT", REC_CLR)
+            self._set_status("Connection Timeout", REC_CLR)
             return
         frames_seen = getattr(self.engine, "frames_seen", 0)
         stats = ""
@@ -798,23 +1321,95 @@ class GesturePuckApp:
             "connect_watchdog",
             f"generation={generation} frames_seen={frames_seen} status={self.status.get()!r} {stats}",
         )
-        if frames_seen == 0 and self.status.get() == "CONNECTING…":
-            self._set_status("WAITING FOR FRAMES", TEXT_MED)
+        if frames_seen == 0 and self.status.get() == "Connecting…":
+            self._set_status("Waiting for Frames", TEXT_MED)
+
+    def _clean_status_text(self, text):
+        """Make top-right status consistent for Serial and BLE."""
+        mapping = {
+            "NOT CONNECTED": "Not Connected",
+            "CONNECTING…": "Connecting…",
+            "BLE CONNECTING…": "Connecting…",
+            "WAITING FOR FRAMES": "Waiting for Frames",
+            "BLE WAITING FOR FRAMES": "Waiting for Frames",
+            "RECEIVING FRAMES": "Receiving Frames",
+            "BLE RECEIVING FRAMES": "Receiving Frames",
+            "RECALIBRATED": "Ready",
+            "BACKGROUND CALIBRATED": "Ready",
+            "BLE CONNECTED": "Waiting for Frames",
+            "SCANNING…": "Scanning…",
+            "WAITING FOR HAND": "Waiting for Frames",
+        }
+        if not isinstance(text, str):
+            return str(text)
+        upper = text.upper()
+        if upper in mapping:
+            return mapping[upper]
+        if upper.startswith("RECALIBRATING") or "CALIBRATING" in upper:
+            return "Calibrating"
+        if upper.startswith("ERROR") or upper.startswith("BLE ERROR"):
+            return "Error"
+        if upper.startswith("BLE RECEIVING FRAMES"):
+            return "Receiving Frames"
+        return text
+
+    def _schedule_ready(self, delay_ms=900):
+        """Set Ready after current loading/calibration status has had time to show."""
+        self._ready_token += 1
+        token = self._ready_token
+
+        def mark_ready():
+            if token != self._ready_token:
+                return
+            self._serial_is_calibrating = False
+            with self._ble_state_lock:
+                self._ble_is_calibrating = False
+            current = self.status.get()
+            if current not in {"Error", "BLE Error", "Disconnected", "Not Connected", "Connection Timeout"}:
+                self._set_status("Ready", ACCENT)
+
+        self.root.after(delay_ms, mark_ready)
 
     def _set_status(self, text, color):
+        text = self._clean_status_text(text)
+        if text == "Ready":
+            color = ACCENT
+        elif text == "Receiving Frames":
+            color = ACCENT2
+        elif text == "Calibrating":
+            color = ACCENT
+        elif text == "Scanning…":
+            color = TEXT_DIM
         if getattr(self, "status", None) is not None and self.status.get() != text:
             self.logger.log("status", f"{self.status.get()} -> {text}")
         self.status.set(text)
         self._status_lbl.config(fg=color)
-        dot_color = ACCENT if color == ACCENT else (
+        dot_color = ACCENT if color in {ACCENT, ACCENT2} else (
             REC_CLR if color == REC_CLR else TEXT_DIM)
         self._status_dot.delete("all")
         self._status_dot.create_oval(0, 0, 8, 8, fill=dot_color, outline="")
 
     def _on_engine_status(self, text):
         self.logger.log("engine_status", text)
-        color = ACCENT if text == "RECEIVING FRAMES" else TEXT_MED
-        self._ui_events.put(("status", text, color))
+        clean = self._clean_status_text(text)
+
+        # In dual/direct mode calibration_frames is usually 0, so
+        # GestureEngine.recalibrate() may immediately emit RECALIBRATED. Keep
+        # the top-right pill on Calibrating briefly so the button does not look
+        # like it did nothing. The reset still happens immediately.
+        if clean == "Ready" and self._serial_is_calibrating and time.time() < self._serial_calibrating_until:
+            self.logger.log("engine_status_suppressed", "holding Calibrating before Ready")
+            return
+
+        color = ACCENT if clean == "Ready" else (ACCENT2 if clean == "Receiving Frames" else TEXT_MED)
+        self._ui_events.put(("status", clean, color))
+        if clean == "Receiving Frames" and not self._serial_is_calibrating:
+            self._schedule_ready(delay_ms=900)
+        elif clean == "Ready":
+            self._serial_is_calibrating = False
+        elif clean == "Calibrating":
+            self._serial_is_calibrating = True
+            self._serial_calibrating_until = time.time() + 0.9
 
     def _poll_ui_events(self):
         try:
@@ -837,22 +1432,18 @@ class GesturePuckApp:
 
     def _on_close(self):
         self.logger.log("app_close", "closing GesturePuck UI")
-        if self.engine is not None:
-            self.engine.stop()
-            self.engine = None
+        self._stop_existing_engine()
         self.logger.close()
         self.root.destroy()
 
     # ── EVENTS ────────────────────────────────────────────────────────────────
     def _on_gesture_event(self, gesture_name: str, confidence: float):
-    # Engine runs in a background thread, so use root.after() 
-    # to safely touch the UI from the main thread
         self._ui_events.put(("gesture", gesture_name, confidence))
 
     def _handle_gesture(self, gesture_name: str, confidence: float):
         self.logger.log("gesture", f"name={gesture_name} confidence={confidence:.3f}")
         self.last_gesture.set(f"{gesture_name} ({confidence:.0%})")
-    
+
         active_app = get_mapped_app()
         macro = (
             self.mappings.get(active_app, {}).get(gesture_name, {}).get("macro")
@@ -869,12 +1460,8 @@ class GesturePuckApp:
                 self._set_status("MACRO ERROR", REC_CLR)
         else:
             self.logger.log("macro_missing", f"gesture={gesture_name} active_app={active_app!r}")
-       
-
-
 
     def _on_event(self, msg):
-        pass
         print(f"[DEBUG] received: {repr(msg)}")
         if "_DOWN" in msg:
             gesture = msg.replace("_DOWN", "").strip()
@@ -1035,7 +1622,6 @@ class GesturePuckApp:
         self._render_page(self.current_page)
 
     def _add_new_gesture(self, app_name):
-        pass
         existing = self.mappings.get(app_name, {})
         i, name = len(existing) + 1, ""
         while not name or name in existing:

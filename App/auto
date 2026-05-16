@@ -1,0 +1,2 @@
+[2026-05-14T20:00:19] [startup] args={'port': None, 'baud': 115200, 'auto_connect': False, 'demo': False, 'serial_debug': False, 'serial_debug_bytes': False, 'ui_log': 'auto', 'serial_debug_log': None}
+[2026-05-14T20:01:54] [startup] args={'port': None, 'baud': 115200, 'auto_connect': False, 'demo': False, 'serial_debug': False, 'serial_debug_bytes': False, 'ui_log': 'auto', 'serial_debug_log': None}
