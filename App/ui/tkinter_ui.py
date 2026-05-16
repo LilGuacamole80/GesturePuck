@@ -172,6 +172,10 @@ TK_KEY_NAMES = {
     "command": "cmd",
     "super_l": "cmd",
     "super_r": "cmd",
+    "win_l": "cmd",
+    "win_r": "cmd",
+    "windows_l": "cmd",
+    "windows_r": "cmd",
     "return": "enter",
     "escape": "esc",
     "backspace": "backspace",
@@ -191,10 +195,11 @@ KNOWN_GESTURES = [
         "push", "pull", "hold_center"
     ]
 
-for _k in ("cmd_l", "cmd_r"):
+for _k in ("cmd_l", "cmd_r", "win_l", "win_r"):
     _v = getattr(pynput_kb.Key, _k, None)
     if _v:
         MODIFIER_KEYS.add(_v)
+        PYNPUT_KEY_NAMES[_v] = "cmd"
 
 
 # ── WIDGET HELPERS ─────────────────────────────────────────────────────────────
@@ -329,6 +334,13 @@ def check_macos_permissions(logger=None):
 
 # ── KEY RECORDER ───────────────────────────────────────────────────────────────
 class GlobalKeyRecorder:
+    """
+    Records one keyboard shortcut at a time.
+
+    Important: the listener is created only while REC is armed and uses
+    suppress=True. That means shortcuts like Win+Shift+S are captured for the
+    macro field but are not sent to Windows/macOS/Linux while recording.
+    """
     def __init__(self, logger=None):
         self.logger = logger
         self._armed = False
@@ -339,7 +351,6 @@ class GlobalKeyRecorder:
         self.results: queue.Queue = queue.Queue()
         self.errors: queue.Queue = queue.Queue()
         self._listener = None
-        self._start_listener()
 
     def _log(self, event, message):
         if self.logger is not None:
@@ -350,20 +361,31 @@ class GlobalKeyRecorder:
             self.logger.exception(event, exc)
 
     def _start_listener(self):
+        # Stop any old recorder hook before starting a fresh suppressed hook.
+        self._stop_listener()
         try:
-            self._log("recorder_listener", "starting pynput keyboard listener")
+            self._log("recorder_listener", "starting suppressed pynput keyboard listener")
             self._listener = pynput_kb.Listener(
                 on_press=self._on_press,
                 on_release=self._on_release,
-                suppress=False,
+                suppress=True,
             )
             self._listener.daemon = True
             self._listener.start()
-            self._log("recorder_listener", f"started running={self.running}")
+            self._log("recorder_listener", f"started running={self.running} suppress=True")
         except Exception as exc:
             self._listener = None
             self.errors.put(str(exc))
             self._log_exception("recorder_listener_error", exc)
+
+    def _stop_listener(self):
+        listener = self._listener
+        self._listener = None
+        if listener is not None:
+            try:
+                listener.stop()
+            except Exception:
+                pass
 
     @property
     def running(self):
@@ -378,13 +400,15 @@ class GlobalKeyRecorder:
             self._chord = []
             self._held  = set()
             self._token = token
-        self._log("recorder_arm", f"token={token} running={self.running}")
+        self._start_listener()
+        self._log("recorder_arm", f"token={token} running={self.running} suppress=True")
 
     def cancel(self):
         with self._lock:
             self._armed = False
             self._chord = []
             self._held  = set()
+        self._stop_listener()
         self._log("recorder_cancel", "global recorder cancelled")
 
     def _canonical(self, key):
@@ -393,13 +417,23 @@ class GlobalKeyRecorder:
         ch = getattr(key, "char", None)
         if ch:
             return ch.lower()
-        return str(key).replace("<", "").replace(">", "")
+        raw = str(key).replace("<", "").replace(">", "")
+        raw = raw.replace("Key.", "").lower()
+        if raw in {"cmd_l", "cmd_r", "win_l", "win_r", "super_l", "super_r"}:
+            return "cmd"
+        if raw in {"shift_l", "shift_r"}:
+            return "shift"
+        if raw in {"ctrl_l", "ctrl_r", "control_l", "control_r"}:
+            return "ctrl"
+        if raw in {"alt_l", "alt_r", "option_l", "option_r"}:
+            return "alt"
+        return raw
 
     def _on_press(self, key):
         try:
             with self._lock:
                 if not self._armed:
-                    return
+                    return False
                 name = self._canonical(key)
                 if key not in self._held:
                     self._held.add(key)
@@ -414,21 +448,28 @@ class GlobalKeyRecorder:
 
     def _on_release(self, key):
         try:
+            should_stop = False
             with self._lock:
                 if not self._armed:
-                    return
+                    return False
                 if key in MODIFIER_KEYS:
-                    return
+                    return False
                 chord = "+".join(self._chord)
                 token = self._token
                 self._armed = False
                 self._chord = []
                 self._held  = set()
-            self._log("recorder_result", f"token={token} chord={chord} source=global")
-            self.results.put((token, chord, "global"))
+                should_stop = True
+            self._log("recorder_result", f"token={token} chord={chord} source=global_suppressed")
+            self.results.put((token, chord, "global_suppressed"))
+            if should_stop:
+                # Stop shortly after returning so the final release is swallowed too.
+                threading.Timer(0.05, self._stop_listener).start()
+            return False
         except Exception as exc:
             self.errors.put(str(exc))
             self._log_exception("recorder_key_release_error", exc)
+            return False
 
 
 # ── BLE SCAN DIALOG ────────────────────────────────────────────────────────────
@@ -1506,9 +1547,9 @@ class GesturePuckApp:
         self._local_chord = []
         self._local_held = set()
         self.root.focus_set()
-        if not self.recorder.running:
-            self.logger.log("record_warning", "pynput listener is not running; using Tk focused-window fallback")
         self.recorder.arm(token)
+        if not self.recorder.running:
+            self.logger.log("record_warning", "suppressed pynput listener is not running; using Tk focused-window fallback")
 
     def _canonical_tk_key(self, event):
         keysym = (event.keysym or "").lower()

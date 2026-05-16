@@ -7,3 +7,5 @@ __pycache__/
 *.pyc
 .venv/
 env/
+App/logs/
+App/logs/*
