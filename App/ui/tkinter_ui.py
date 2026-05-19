@@ -20,6 +20,8 @@ from lidar_gesture_studio import (
     configure_runtime_args,
     parse_frame_line,
 )
+from engine.packs import ModeManager
+from ui.pack_panel import render_pack_page, render_pack_sidebar_section
 
 
 APP_DIR = Path(__file__).resolve().parents[1]
@@ -604,6 +606,7 @@ class GesturePuckApp:
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self.mappings     = store.load()
+        self.mode_manager = ModeManager()
         self.devices      = []
         self.connection   = None        # BLE connection handle (if connected via BLE)
         self.current_page = "Global"
@@ -791,6 +794,12 @@ class GesturePuckApp:
             b.bind("<Enter>", _enter)
             b.bind("<Leave>", _leave)
 
+        render_pack_sidebar_section(
+            sidebar,
+            self.mode_manager,
+            self._nav_btns,
+            on_show_pack=self._show_pack_page,
+        )
         tk.Frame(body, bg=BORDER, width=1).pack(side="left", fill="y")
 
         content_outer = tk.Frame(body, bg=BG)
@@ -1485,6 +1494,15 @@ class GesturePuckApp:
         self.logger.log("gesture", f"name={gesture_name} confidence={confidence:.3f}")
         self.last_gesture.set(f"{gesture_name} ({confidence:.0%})")
 
+    # ── Pack mode check — runs BEFORE default app detection ──────────────
+        handled = self.mode_manager.handle(gesture_name, self.root)
+        if handled:
+            if gesture_name == "hold_center":
+                self._on_mode_change()  # refresh UI to show Default mode
+            self.logger.log("gesture_pack", f"gesture={gesture_name} handled by pack")
+            return
+
+    # ── Default mode — active app detection ──────────────────────────────
         active_app = get_mapped_app()
         macro = (
             self.mappings.get(active_app, {}).get(gesture_name, {}).get("macro")
@@ -1671,6 +1689,34 @@ class GesturePuckApp:
             "label": name, "macro": ""}
         store.save(self.mappings)
         self._render_page(app_name)
+
+    def _show_pack_page(self, pack_id: str):
+        for name, btn in self._nav_btns.items():
+            btn.config(bg=SURFACE, fg=TEXT_MED)
+        pack_btn = self._nav_btns.get(f"pack:{pack_id}")
+        if pack_btn:
+            pack_btn.config(bg=ACCENT_DIM, fg=TEXT)
+        pack = self.mode_manager._packs.get(pack_id)
+        if pack:
+            render_pack_page(
+                self.content_frame,
+                pack,
+                self.mode_manager,
+                on_mode_change=self._on_mode_change,
+            )
+
+    def _on_mode_change(self):
+        pack = self.mode_manager.active_pack()
+        if pack:
+            self._set_status(f"{pack.icon} {pack.name.upper()} ACTIVE", ACCENT2)
+        else:
+            self._set_status("Default Mode", TEXT_MED)
+    # Refresh sidebar to update active indicators
+        for w in self.root.winfo_children():
+            w.destroy()
+        self._nav_btns = {}
+        self._build_ui()
+        self._show_page(self.current_page)
 
 
 # ── ENTRY POINT ────────────────────────────────────────────────────────────────
