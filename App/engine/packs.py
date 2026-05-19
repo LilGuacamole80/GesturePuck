@@ -420,7 +420,7 @@ def build_all_packs() -> dict[str, GesturePack]:
     }
 
 
-# ── MODE MANAGER ──────────────────────────────────────────────────────────────
+# ── MODE MANAGER ────────────────────────────────────────────────────────────
 
 class ModeManager:
     """
