@@ -21,6 +21,8 @@
 static BLECharacteristic *pTxCharacteristic = nullptr;
 static bool bleConnected = false;
 
+static void handleHostCommand(String command);
+
 // BLE server callbacks — track connection state
 class ServerCallbacks : public BLEServerCallbacks {
     void onConnect(BLEServer *pServer) override {
@@ -41,10 +43,10 @@ class RxCallbacks : public BLECharacteristicCallbacks {
         String value = pCharacteristic->getValue().c_str();
         value.trim();
         if (value.length() > 0) {
-            // Echo received command to Serial for debugging
+            // Echo received command to Serial for debugging, then handle it.
             Serial.print("#BLE_RX,");
             Serial.println(value);
-            // Future: handle commands like "RECALIBRATE", "LED_OFF", etc.
+            handleHostCommand(value);
         }
     }
 };
@@ -72,7 +74,7 @@ static void bleSendLine(const char *line) {
 #define NUM_LEDS 12
 
 // Hand detection threshold
-#define HAND_THRESHOLD 500
+#define HAND_THRESHOLD 200
 
 // Serial stream settings
 const uint32_t SERIAL_BAUD      = 115200;
@@ -80,6 +82,16 @@ const uint32_t FRAME_PERIOD_MS  = 50;       // 20 Hz target
 const uint32_t STATUS_PERIOD_MS = 1000;
 const uint8_t  LED_BRIGHTNESS   = 8;
 const bool     STREAM_TOF2      = false;
+
+// LED orientation setup for the 12x WS2812B ring.
+// Change this one number to match the physical LED you consider "UP".
+// Use 1..12 as printed/imagined around the ring. The code converts to 0..11.
+const uint8_t  LED_UP_NUMBER    = 1;
+
+// If left/right look reversed on your physical ring, flip this to false.
+const bool     LED_CLOCKWISE_IS_RIGHT = true;
+
+String serialCommandBuffer;
 
 // ── Sensor objects ─────────────────────────────────────────────────────────────
 DFRobot_MatrixLidar_I2C tof1(TOF1_ADDR);
@@ -104,6 +116,87 @@ uint32_t frameSeq     = 0;
 void setRingColor(CRGB color) {
     for (int i = 0; i < NUM_LEDS; i++) leds[i] = color;
     FastLED.show();
+}
+
+void clearRing() {
+    setRingColor(CRGB::Black);
+}
+
+uint8_t ledUpIndex() {
+    uint8_t n = LED_UP_NUMBER;
+    if (n < 1) n = 1;
+    if (n > NUM_LEDS) n = NUM_LEDS;
+    return n - 1;
+}
+
+uint8_t wrapLedIndex(int idx) {
+    while (idx < 0) idx += NUM_LEDS;
+    while (idx >= NUM_LEDS) idx -= NUM_LEDS;
+    return (uint8_t)idx;
+}
+
+uint8_t compassLedIndex(const String &direction) {
+    // With 12 LEDs, one quarter-turn is 3 LEDs.
+    // UP is user-selected. RIGHT/DOWN/LEFT are derived from that orientation.
+    int up = ledUpIndex();
+    int step = LED_CLOCKWISE_IS_RIGHT ? 1 : -1;
+
+    if (direction == "swipe_up")    return wrapLedIndex(up);
+    if (direction == "swipe_right") return wrapLedIndex(up + step * 3);
+    if (direction == "swipe_down")  return wrapLedIndex(up + step * 6);
+    if (direction == "swipe_left")  return wrapLedIndex(up - step * 3);
+    return wrapLedIndex(up);
+}
+
+void showSwipeAnimation(const String &gesture) {
+    int center = compassLedIndex(gesture);
+
+    // Start with the direction LED, then two around it, then expand outward
+    // until the whole ring is green. This models the gesture direction without
+    // changing any sensing/classification behavior.
+    clearRing();
+    leds[center] = CRGB::Green;
+    FastLED.show();
+    delay(55);
+
+    for (int radius = 1; radius <= NUM_LEDS / 2; radius++) {
+        leds[wrapLedIndex(center - radius)] = CRGB::Green;
+        leds[wrapLedIndex(center + radius)] = CRGB::Green;
+        FastLED.show();
+        delay(55);
+    }
+}
+
+void handleHostCommand(String command) {
+    command.trim();
+    if (command.length() == 0) return;
+
+    if (command.startsWith("LED_GESTURE,")) {
+        String gesture = command.substring(String("LED_GESTURE,").length());
+        gesture.trim();
+
+        if (gesture == "swipe_left" || gesture == "swipe_right" ||
+            gesture == "swipe_up"   || gesture == "swipe_down") {
+            showSwipeAnimation(gesture);
+        }
+        // push/pull/hold_center intentionally do nothing for now.
+        return;
+    }
+}
+
+void readSerialCommands() {
+    while (Serial.available() > 0) {
+        char c = (char)Serial.read();
+        if (c == '\r') continue;
+        if (c == '\n') {
+            handleHostCommand(serialCommandBuffer);
+            serialCommandBuffer = "";
+        } else if (serialCommandBuffer.length() < 96) {
+            serialCommandBuffer += c;
+        } else {
+            serialCommandBuffer = "";
+        }
+    }
 }
 
 void scanI2C() {
@@ -255,6 +348,7 @@ void setup() {
 }
 
 void loop() {
+    readSerialCommands();
     if (millis() - lastPrintMs < FRAME_PERIOD_MS) return;
     lastPrintMs = millis();
 
