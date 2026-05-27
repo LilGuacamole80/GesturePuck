@@ -12,9 +12,9 @@ dependencies = [
     "psutil>=5.9.0",
     "pynput>=1.7.6",
     "pyserial>=3.5",
-
     "pywin32>=306; sys_platform == 'win32'",
     "pyobjc-framework-Cocoa>=9.2; sys_platform == 'darwin'",
+    "pyinstaller>=6.20.0",
 ]
 
 [dependency-groups]
