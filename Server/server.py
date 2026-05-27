@@ -44,6 +44,10 @@ async def home(request: Request):
 def settings(request: Request):
     return templates.TemplateResponse(request, "settings.html")
 
+@app.get("/shop", response_class=HTMLResponse)
+def settings(request: Request):
+    return templates.TemplateResponse(request, "shop.html")
+
 @app.get("/team", response_class=HTMLResponse)
 def settings(request: Request):
     return templates.TemplateResponse(request, "team.html")

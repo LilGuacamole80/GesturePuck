@@ -410,15 +410,63 @@ def _make_github_pack() -> GesturePack:
     )
 
 
+def _make_garageband_pack() -> GesturePack:
+    return GesturePack(
+        id="garageband",
+        name="GarageBand Pack",
+        description="Automated garageBand workflow chains — record take, save and bounce, new track, cycle region, mix & master, undo",
+        icon="🎸",
+        gestures={
+            "swipe_right": {
+                "label": "Record take",
+                "description": "move playhead to beginning of selected region, arm selected track for recording, start recording, open count-in metronome, ",
+                "action": _chain_quick_push,
+            },
+            "swipe_left": {
+                "label": "Save & Bounce",
+                "description": "Save project, Share → Export to disk, Set format to MP3 highest quality, Open export destination folder, Open exported file in Finder",
+                "action": _chain_sync_main,
+            },
+            "swipe_up": {
+                "label": "New Track",
+                "description": "Open new track dialog, Select software instrument, Name track with timestamp, Arm for recording, Set input monitoring on",
+                "action": _chain_new_feature_branch,
+            },
+            "swipe_down": {
+                "label": "Stash & Clean",
+                "description": "stash → clean -fd → fetch --prune → delete merged branches",
+                "action": _chain_stash_and_clean,
+            },
+            "push": {
+                "label": "Cycle Region",
+                "description": "Set cycle region to selected region, Enable cycle mode, Start playback on loop, Open Smart Controls panel ",
+                "action": _chain_pr_status,
+            },
+            "pull": {
+                "label": "Mix & Master",
+                "description": "Solo no tracks, Open Master track, Enable loudness meter, Start playback from beginning, Open EQ on master, Open compressor on master",
+                "action": _chain_undo_last_commit,
+            },
+            "hold_center": {
+                "label": "Undo Take",
+                "description": "Stop recording/playback, Undo last recording, Clear the region just recorded, Move playhead back to start of region, Keep track armed for another take",
+                "action": None,  # handled by ModeManager
+            },
+        },
+        purchased=True,
+    )
+
+
 # ── REGISTRY ──────────────────────────────────────────────────────────────────
 
 def build_all_packs() -> dict[str, GesturePack]:
     github = _make_github_pack()
+    garageband = _make_garageband_pack()
     return {
         github.id: github,
-        # future: "figma": _make_figma_pack(),
+        garageband.id: garageband
     }
-
+   
 
 # ── MODE MANAGER ────────────────────────────────────────────────────────────
 
