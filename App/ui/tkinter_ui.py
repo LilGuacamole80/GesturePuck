@@ -298,6 +298,26 @@ def default_serial_port():
     return ""
 
 
+
+
+def _unique_display_labels(items, *, prefer_name=False):
+    """Return [(raw_value, display_label), ...] with clean labels and no addresses/details.
+
+    For BLE, display only the advertised name when available. Duplicate names get
+    a small number suffix so the hidden address mapping still stays unique.
+    For serial, display only the actual port name.
+    """
+    counts = {}
+    result = []
+    for raw, name in items:
+        base = (name or raw or "Unknown").strip() if prefer_name else (raw or name or "Unknown").strip()
+        if not base:
+            base = "Unknown"
+        counts[base] = counts.get(base, 0) + 1
+        label = base if counts[base] == 1 else f"{base} ({counts[base]})"
+        result.append((raw, label))
+    return result
+
 def check_macos_permissions(logger=None):
     """Checks and prompts for required macOS permissions on first launch"""
     if sys.platform != "darwin":
@@ -541,9 +561,10 @@ class BleScanDialog(tk.Toplevel):
             if self.logger:
                 self.logger.log("ble_scan", "no devices found")
             return
-        for addr, name in devices:
-            marker = "★ " if "GesturePuck" in name else "  "
-            self._lb.insert(tk.END, f"{marker}{name}   [{addr}]")
+        display_rows = _unique_display_labels(devices, prefer_name=True)
+        for (addr, name), (_raw, label) in zip(devices, display_rows):
+            marker = "★ " if "GesturePuck" in (name or "") else "  "
+            self._lb.insert(tk.END, f"{marker}{label}")
         # auto-select first GesturePuck
         for i, (_, name) in enumerate(devices):
             if "GesturePuck" in name:
@@ -646,6 +667,7 @@ class GesturePuckApp:
         self._serial_calibrating_until = 0.0
 
         self._build_ui()
+        self._on_connection_type_changed()
         self.root.bind_all("<KeyPress>", self._on_local_key_press, add="+")
         self.root.bind_all("<KeyRelease>", self._on_local_key_release, add="+")
         self._show_page("Global")
@@ -684,62 +706,81 @@ class GesturePuckApp:
         self._status_lbl.pack(side="left", padx=(4, 0))
 
         # ── DEVICE BAR ────────────────────────────────────────────────────────
-        devrow = tk.Frame(self.root, bg=BG)
-        devrow.pack(fill="x", padx=20, pady=8)
+        # Two compact rows prevent long device names/status fields from being
+        # clipped while keeping the same connect/scan behavior.
+        devbar = tk.Frame(self.root, bg=BG)
+        devbar.pack(fill="x", padx=20, pady=(8, 6))
 
-        # --- Unified connection section: Direct USB/COM or Bluetooth BLE ---
-        mk_label(devrow, "CONNECT BY", fg=TEXT_DIM).pack(side="left", padx=(0, 8))
-        self._conn_type_combo = ttk.Combobox(
-            devrow,
-            textvariable=self.connection_type_var,
-            values=("Direct", "Bluetooth"),
-            state="readonly",
-            width=10,
-            font=FONT_MONO,
-        )
-        self._conn_type_combo.pack(side="left", padx=(0, 8), ipady=2)
-        self._conn_type_combo.bind("<<ComboboxSelected>>", self._on_connection_type_changed)
+        devrow = tk.Frame(devbar, bg=BG)
+        devrow.pack(fill="x")
 
-        mk_label(devrow, "DEVICE", fg=TEXT_DIM).pack(side="left", padx=(0, 8))
-        self.port_var = tk.StringVar(value=self.default_port)  # raw value: COM5 or BLE:<addr>
-        self._device_combo = ttk.Combobox(
-            devrow,
-            textvariable=self.device_var,
-            values=(),
-            state="normal",
-            width=36,
-            font=FONT_MONO,
-        )
-        self._device_combo.pack(side="left", padx=(0, 8), ipady=2)
-        self._device_combo.bind("<<ComboboxSelected>>", self._on_device_selected)
-
-        mk_btn(devrow, "SCAN", self._scan_devices, bg=ACCENT2, fg=BG).pack(side="left", padx=(0, 4))
-        mk_btn(devrow, "CONNECT", self._connect, bg=ACCENT, fg=BG).pack(side="left", padx=(0, 4))
-
-        mk_btn(devrow, "DEMO",    self._connect_demo, bg=SURFACE2, fg=TEXT_MED).pack(side="left")
-        mk_btn(devrow, "RECALIBRATE", self._recalibrate, bg=SURFACE2, fg=ACCENT).pack(side="left", padx=(8, 0))
-
-        # Connection-mode indicator (updates dynamically)
-        self._conn_mode_var = tk.StringVar(value="")
-        self._conn_mode_lbl = tk.Label(
-            devrow, textvariable=self._conn_mode_var,
-            bg=BG, fg=TEXT_DIM, font=FONT_LABEL,
-        )
-        self._conn_mode_lbl.pack(side="left", padx=(10, 0))
-
-        mk_label(devrow, f"· {self.baud}", fg=TEXT_DIM).pack(side="left", padx=(4, 0))
-
-        # gesture pill
+        # Keep the last-gesture pill on the far right with enough reserved width.
         gf = tk.Frame(devrow, bg=BG)
-        gf.pack(side="right")
+        gf.pack(side="right", padx=(16, 0))
         mk_label(gf, "LAST GESTURE", fg=TEXT_DIM).pack(side="left")
         self._gesture_badge = tk.Label(
             gf, textvariable=self.last_gesture,
             bg=SURFACE2, fg=ACCENT,
             font=("Courier New", 11, "bold"),
+            width=22, anchor="center",
             padx=10, pady=2,
         )
         self._gesture_badge.pack(side="left", padx=(8, 0))
+
+        # --- Unified connection section: Direct USB/COM or Bluetooth BLE ---
+        controls = tk.Frame(devrow, bg=BG)
+        controls.pack(side="left", fill="x", expand=True)
+
+        mk_label(controls, "CONNECT BY", fg=TEXT_DIM).pack(side="left", padx=(0, 8))
+        self._conn_type_combo = ttk.Combobox(
+            controls,
+            textvariable=self.connection_type_var,
+            values=("Direct", "Bluetooth"),
+            state="readonly",
+            width=11,
+            font=FONT_MONO,
+        )
+        self._conn_type_combo.pack(side="left", padx=(0, 8), ipady=2)
+        self._conn_type_combo.bind("<<ComboboxSelected>>", self._on_connection_type_changed)
+
+        mk_label(controls, "DEVICE", fg=TEXT_DIM).pack(side="left", padx=(0, 8))
+        self.port_var = tk.StringVar(value=self.default_port)  # raw value: COM5 or BLE:<addr>
+        self._device_combo = ttk.Combobox(
+            controls,
+            textvariable=self.device_var,
+            values=(),
+            state="normal",
+            width=42,
+            font=FONT_MONO,
+        )
+        self._device_combo.pack(side="left", padx=(0, 8), ipady=2)
+        self._device_combo.bind("<<ComboboxSelected>>", self._on_device_selected)
+
+        mk_btn(controls, "SCAN", self._scan_devices, bg=ACCENT2, fg=BG, width=8).pack(side="left", padx=(0, 4))
+        mk_btn(controls, "CONNECT", self._connect, bg=ACCENT, fg=BG, width=10).pack(side="left", padx=(0, 4))
+        mk_btn(controls, "DISCONNECT", self._disconnect_manual, bg=SURFACE2, fg=REC_CLR, width=12).pack(side="left", padx=(0, 4))
+        mk_btn(controls, "DEMO", self._connect_demo, bg=SURFACE2, fg=TEXT_MED, width=7).pack(side="left", padx=(0, 4))
+        mk_btn(controls, "RECALIBRATE", self._recalibrate, bg=SURFACE2, fg=ACCENT, width=13).pack(side="left")
+
+        info_row = tk.Frame(devbar, bg=BG)
+        info_row.pack(fill="x", pady=(5, 0))
+
+        # Connection-mode indicator (updates dynamically)
+        self._conn_mode_var = tk.StringVar(value="")
+        self._conn_mode_lbl = tk.Label(
+            info_row, textvariable=self._conn_mode_var,
+            bg=BG, fg=TEXT_DIM, font=FONT_LABEL, anchor="w",
+        )
+        self._conn_mode_lbl.pack(side="left")
+
+        mk_label(info_row, f" · {self.baud}", fg=TEXT_DIM).pack(side="left", padx=(4, 0))
+
+        self._setup_hint_var = tk.StringVar(value="")
+        self._setup_hint_lbl = tk.Label(
+            info_row, textvariable=self._setup_hint_var,
+            bg=BG, fg=TEXT_DIM, font=FONT_LABEL, anchor="w",
+        )
+        self._setup_hint_lbl.pack(side="left", padx=(14, 0), fill="x", expand=True)
 
         mk_separator(self.root).pack(fill="x")
 
@@ -916,6 +957,14 @@ class GesturePuckApp:
     # ── DEVICE / CONNECT ──────────────────────────────────────────────────────
     def _on_connection_type_changed(self, event=None):
         mode = self.connection_type_var.get()
+        # Changing transport is setup mode. Stop the active stream first so
+        # gestures/macros cannot fire while the user is switching devices.
+        if self.engine is not None or self.connection is not None:
+            self.logger.log("connection_type_change", "disconnecting active transport before switch")
+            self._connect_generation += 1
+            self._stop_existing_engine()
+            self.last_gesture.set("—")
+            self._set_status("Not Connected", TEXT_DIM)
         self._device_display_to_value.clear()
         self._device_combo.configure(values=())
         if mode == "Direct":
@@ -923,11 +972,15 @@ class GesturePuckApp:
             self.device_var.set(self.default_port or "")
             self._conn_mode_var.set("MODE · DIRECT USB")
             self._conn_mode_lbl.config(fg=ACCENT)
+            if hasattr(self, "_setup_hint_var"):
+                self._setup_hint_var.set("Direct mode uses your USB serial port, for example COM5 or /dev/cu.usbserial-xxxx.")
         else:
             self.port_var.set("")
-            self.device_var.set("Press SCAN to find GesturePuck")
+            self.device_var.set("Press SCAN, then choose GesturePuck")
             self._conn_mode_var.set("MODE · BLUETOOTH")
             self._conn_mode_lbl.config(fg=ACCENT2)
+            if hasattr(self, "_setup_hint_var"):
+                self._setup_hint_var.set("Bluetooth mode shows friendly names only; the BLE address stays hidden internally.")
 
     def _on_device_selected(self, event=None):
         shown = self.device_var.get().strip()
@@ -979,9 +1032,7 @@ class GesturePuckApp:
             pucks = [(addr, name) for addr, name in devices if "GesturePuck" in (name or "")]
             ordered = pucks + [(addr, name) for addr, name in devices if (addr, name) not in pucks]
             labels = []
-            for addr, name in ordered:
-                shown_name = name or addr
-                label = f"{shown_name} · {addr}"
+            for addr, label in _unique_display_labels(ordered, prefer_name=True):
                 self._device_display_to_value[label] = f"BLE:{addr}"
                 labels.append(label)
             self._device_combo.configure(values=labels)
@@ -999,14 +1050,15 @@ class GesturePuckApp:
             return
 
         labels = []
-        for port, label in devices:
+        clean_devices = _unique_display_labels(devices, prefer_name=False)
+        for port, label in clean_devices:
             self._device_display_to_value[label] = port
             labels.append(label)
         self._device_combo.configure(values=labels)
         if labels:
             # Prefer COM5 when available because that is your usual GesturePuck
             # direct port; otherwise choose the first detected port.
-            chosen = next((label for port, label in devices if port.upper() == "COM5"), labels[0])
+            chosen = next((label for port, label in clean_devices if port.upper() == "COM5"), labels[0])
             self.device_var.set(chosen)
             self.port_var.set(self._device_display_to_value[chosen])
             self._set_status("Not Connected", TEXT_MED)
@@ -1016,6 +1068,17 @@ class GesturePuckApp:
             self.port_var.set("")
             self._set_status("Not Connected", TEXT_DIM)
             self.logger.log("serial_scan", "no serial ports found")
+
+    def _disconnect_manual(self):
+        """Manual disconnect button for serial/demo/BLE without changing mappings."""
+        self.logger.log("disconnect_click", "manual disconnect requested")
+        self._connect_generation += 1
+        self._stop_existing_engine()
+        self._serial_is_calibrating = False
+        with self._ble_state_lock:
+            self._ble_connected = False
+            self._ble_is_calibrating = False
+        self._set_status("Not Connected", TEXT_DIM)
 
     def _connect(self):
         """Connect using the selected Direct/Bluetooth mode and device."""
@@ -1286,6 +1349,8 @@ class GesturePuckApp:
                 pass
             self.connection = None
         with self._ble_state_lock:
+            self._ble_connected = False
+            self._ble_is_calibrating = False
             self._ble_pipeline = None
             self._ble_detector = None
             self._ble_frames_seen = 0
@@ -1478,12 +1543,43 @@ class GesturePuckApp:
         self.root.destroy()
 
     # ── EVENTS ────────────────────────────────────────────────────────────────
+    def _send_led_gesture(self, gesture_name: str):
+        """Tell the ESP32 firmware to play the LED animation for a gesture.
+
+        This is intentionally best-effort: if the current connection cannot
+        send commands, gesture detection and macros still keep working.
+        """
+        cmd = f"LED_GESTURE,{gesture_name}"
+
+        # BLE UART path: BLEConnection exposes send(text).
+        conn = getattr(self, "connection", None)
+        if conn is not None and hasattr(conn, "send"):
+            try:
+                conn.send(cmd)
+                self.logger.log("led_command", f"ble {cmd}")
+                return
+            except Exception as exc:
+                self.logger.exception("led_command_ble_error", exc)
+
+        # Direct USB/COM path: GestureEngine owns the pyserial object.
+        engine = getattr(self, "engine", None)
+        source = getattr(engine, "source", None)
+        ser = getattr(source, "ser", None)
+        if ser is not None:
+            try:
+                ser.write((cmd + "\n").encode("utf-8"))
+                ser.flush()
+                self.logger.log("led_command", f"serial {cmd}")
+            except Exception as exc:
+                self.logger.exception("led_command_serial_error", exc)
+
     def _on_gesture_event(self, gesture_name: str, confidence: float):
         self._ui_events.put(("gesture", gesture_name, confidence))
 
     def _handle_gesture(self, gesture_name: str, confidence: float):
         self.logger.log("gesture", f"name={gesture_name} confidence={confidence:.3f}")
         self.last_gesture.set(f"{gesture_name} ({confidence:.0%})")
+        self._send_led_gesture(gesture_name)
 
     # ── Pack mode check — runs BEFORE default app detection ──────────────
         handled = self.mode_manager.handle(gesture_name, self.root)
@@ -1516,6 +1612,7 @@ class GesturePuckApp:
         if "_DOWN" in msg:
             gesture = msg.replace("_DOWN", "").strip()
             self.root.after(0, lambda: self.last_gesture.set(gesture))
+            self._send_led_gesture(gesture)
             active_app = get_mapped_app()
             print(f"[DEBUG] active app: {active_app}, gesture: {gesture}")
             macro = (
@@ -1621,6 +1718,7 @@ class GesturePuckApp:
         if self._local_record_token == token:
             self._clear_local_recording()
         self.recorder.cancel()
+        self._save(gesture, mvar.get(), self._label_vars.get(gesture, tk.StringVar(value=gesture)).get())
         self.logger.log(
             "record_result_applied",
             f"token={token} gesture={gesture} chord={chord!r} source={source}",
