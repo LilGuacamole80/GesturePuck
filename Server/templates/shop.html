@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Shop — Gesture Packs</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #050a18;
+      --card-bg:   #0a1228;
+      --card-border: rgba(108, 60, 255, 0.35);
+      --card-glow:  rgba(108, 60, 255, 0.12);
+      --purple:    #6c3cff;
+      --purple-lt: #9f7eff;
+      --cyan:      #00e5ff;
+      --green:     #00ff9d;
+      --orange:    #ff6b35;
+      --yellow:    #ffd600;
+      --text:      #e2e8f8;
+      --muted:     #7a88aa;
+      --tag:       #1b2545;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* ── BACKGROUND MESH ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 20% 10%, rgba(108,60,255,.18) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 35% at 80% 90%, rgba(0,229,255,.10) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 30% at 60% 50%, rgba(0,255,157,.05) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── SCANLINE OVERLAY ── */
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0,0,0,.07) 3px,
+        rgba(0,0,0,.07) 4px
+      );
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .page-wrap {
+      position: relative;
+      z-index: 2;
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 60px 28px 80px;
+    }
+
+    /* ── TITLE ── */
+    h1.shop-title {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(2.4rem, 5vw, 4rem);
+      font-weight: 900;
+      text-align: center;
+      letter-spacing: .06em;
+      margin-bottom: 56px;
+      background: linear-gradient(135deg, #fff 0%, var(--purple-lt) 50%, var(--cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: titlePulse 4s ease-in-out infinite;
+    }
+
+    @keyframes titlePulse {
+      0%, 100% { filter: drop-shadow(0 0 12px rgba(108,60,255,.5)); }
+      50%       { filter: drop-shadow(0 0 28px rgba(108,60,255,.9)); }
+    }
+    header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(8,8,8,0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 0.5px solid var(--border);
+        }
+
+        nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            height: 60px;
+        }
+
+
+    /* ── GRID ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 28px;
+    }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      position: relative;
+      overflow: hidden;
+      transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+      animation: fadeUp .5s ease both;
+    }
+
+    .card:nth-child(1) { animation-delay: .05s; }
+    .card:nth-child(2) { animation-delay: .12s; }
+    .card:nth-child(3) { animation-delay: .19s; }
+    .card:nth-child(4) { animation-delay: .26s; }
+    .card:nth-child(5) { animation-delay: .33s; }
+    .card:nth-child(6) { animation-delay: .40s; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(22px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: var(--card-glow);
+      opacity: 0;
+      transition: opacity .25s ease;
+      border-radius: inherit;
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+      border-color: var(--purple);
+      box-shadow: 0 8px 40px rgba(108,60,255,.25), 0 0 0 1px rgba(108,60,255,.3);
+    }
+
+    .card:hover::before { opacity: 1; }
+
+    /* ── ICON BOX ── */
+    .icon-box {
+      flex-shrink: 0;
+      width: 80px;
+      height: 90px;
+      background: #060d1e;
+      border: 1px solid rgba(108,60,255,.25);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.4rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .icon-box::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,.04) 0%, transparent 60%);
+    }
+
+    /* unique accent per card */
+    .card:nth-child(1) .icon-box { box-shadow: 0 0 18px rgba(0,120,255,.3); }
+    .card:nth-child(2) .icon-box { box-shadow: 0 0 18px rgba(0,229,255,.25); }
+    .card:nth-child(3) .icon-box { box-shadow: 0 0 18px rgba(160,80,255,.3); }
+    .card:nth-child(4) .icon-box { box-shadow: 0 0 18px rgba(0,229,255,.25); }
+    .card:nth-child(5) .icon-box { box-shadow: 0 0 18px rgba(255,107,53,.25); }
+    .card:nth-child(6) .icon-box { box-shadow: 0 0 18px rgba(255,214,0,.25); }
+
+    /* ── CONTENT ── */
+    .card-content { flex: 1; min-width: 0; }
+
+    .card-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: .03em;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+
+    .card-desc {
+      font-size: .84rem;
+      color: var(--muted);
+      line-height: 1.55;
+      margin-bottom: 14px;
+    }
+
+    .meta-row {
+      font-size: .8rem;
+      margin-bottom: 5px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .meta-row .label { color: var(--muted); font-weight: 600; }
+
+    .meta-row .creator { color: var(--cyan); font-weight: 500; }
+    .meta-row .price   { color: var(--green); font-weight: 600; }
+
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px 0 4px; }
+
+    .tag {
+      background: var(--tag);
+      border: 1px solid rgba(108,60,255,.2);
+      border-radius: 20px;
+      padding: 2px 10px;
+      font-size: .72rem;
+      color: var(--purple-lt);
+      letter-spacing: .03em;
+    }
+
+    /* ── DOWNLOAD BTN ── */
+    .btn-download {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      margin-top: 18px;
+      padding: 11px 0;
+      background: transparent;
+      border: 1.5px solid var(--purple);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: .88rem;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: .04em;
+      transition: background .2s ease, box-shadow .2s ease, color .2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-download::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, var(--purple) 0%, rgba(108,60,255,0) 100%);
+      opacity: 0;
+      transition: opacity .2s ease;
+    }
+
+    .btn-download:hover {
+      color: #fff;
+      box-shadow: 0 0 20px rgba(108,60,255,.5);
+    }
+
+    .btn-download:hover::before { opacity: 1; }
+
+    .btn-download span, .btn-download svg { position: relative; z-index: 1; }
+
+    .btn-download:active { transform: scale(.98); }
+
+    /* responsive */
+    @media (max-width: 520px) {
+      .grid { grid-template-columns: 1fr; }
+      .icon-box { width: 64px; height: 74px; font-size: 1.9rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-wrap">
+    <h1 class="shop-title">Shop</h1>
+
+    <div class="grid" id="shop-grid"></div>
+  </div>
+
+  <script>
+    const products = [
+      {
+        icon: '◉',
+        title: 'Git Gestures',
+        desc: 'Supercharge your git workflow with intuitive gesture commands.',
+        creator: 'Me',
+        price: '$0',
+        tags: ['Git', 'Workflow'],
+      }, 
+      {
+        icon: '🎸',
+        title: 'Garage Band',
+        desc: 'Improves your workflow on Garage Band',
+        creator: 'Rama',
+        price: '$0',
+        tags: ['Music', 'Productivity'],
+      },  
+      {
+        icon: '🔷',
+        title: 'VS Code Essentials',
+        desc: 'This pack of gestures helps you navigate codebases with gestures.',
+        creator: 'DevMaster',
+        price: '$0',
+        tags: ['Coding', 'VS Code'],
+      },
+      {
+        icon: '🖱️',
+        title: 'Terminal Navigator',
+        desc: 'Boost your terminal productivity with powerful gesture controls.',
+        creator: 'CommandPro',
+        price: '$0',
+        tags: ['Terminal', 'Productivity'],
+      },
+      {
+        icon: '🔍',
+        title: 'Quick Search',
+        desc: 'Find files, symbols and code instantly with gesture shortcuts.',
+        creator: 'SearchMaster',
+        price: '$0',
+        tags: ['Search', 'Productivity'],
+      },
+      {
+        icon: '⚡',
+        title: 'Multi Cursor Pro',
+        desc: 'Control multiple cursors like a pro with easy gestures.',
+        creator: 'CursorX',
+        price: '$0',
+        tags: ['Editing', 'Productivity'],
+      },
+    ];
+
+    const iconColors = ['#0078ff','#00e5ff','#a050ff','#00c8d4','#ff6b35','#ffd600'];
+    const iconStyles = [
+      'font-size:2rem;color:#0078ff;text-shadow:0 0 12px #0078ff88',
+      'font-size:2.5rem;color:#00e5ff;text-shadow:0 0 12px #00e5ff88',
+      'font-size:1.5rem;font-family:monospace;font-weight:900;color:#a050ff;letter-spacing:-.05em;text-shadow:0 0 10px #a050ff88',
+      'font-size:2.4rem;color:#00c8d4;text-shadow:0 0 12px #00c8d488',
+      'font-size:1.7rem;color:#ff6b35;text-shadow:0 0 10px #ff6b3588',
+      'font-size:2.4rem;color:#ffd600;text-shadow:0 0 12px #ffd60088',
+    ];
+
+    const grid = document.getElementById('shop-grid');
+
+    products.forEach((p, i) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="icon-box">
+          <span style="${iconStyles[i]}">${p.icon}</span>
+        </div>
+        <div class="card-content">
+          <div class="card-title">${p.title}</div>
+          <div class="card-desc">${p.desc}</div>
+          <div class="meta-row"><span class="label">Creator:</span><span class="creator">${p.creator}</span></div>
+          <div class="meta-row"><span class="label">Price:</span><span class="price">${p.price}</span></div>
+          <div class="tags">${p.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+          <button class="btn-download" onclick="handleDownload(this, '${p.title}')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <span>Download</span>
+          </button>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+
+    function handleDownload(btn, title) {
+      btn.querySelector('span').textContent = 'Downloaded!';
+      btn.style.borderColor = 'var(--green)';
+      btn.style.color = 'var(--green)';
+      setTimeout(() => {
+        btn.querySelector('span').textContent = 'Download';
+        btn.style.borderColor = '';
+        btn.style.color = '';
+      }, 2000);
+    }
+  </script>
+</body>
+</html>

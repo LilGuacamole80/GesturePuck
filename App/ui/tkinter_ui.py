@@ -359,9 +359,15 @@ class GlobalKeyRecorder:
     """
     Records one keyboard shortcut at a time.
 
-    Important: the listener is created only while REC is armed and uses
-    suppress=True. That means shortcuts like Win+Shift+S are captured for the
-    macro field but are not sent to Windows/macOS/Linux while recording.
+    The listener is created ONCE at __init__ and runs for the entire lifetime
+    of the process (suppress=False). This avoids the macOS crash caused by
+    constructing/starting a pynput Listener from a Tk button callback, and
+    also avoids the deadlock caused by calling listener.stop() from inside the
+    listener's own callback thread.
+
+    Trade-off: because suppress=False, the key pressed during recording will
+    also fire in whatever app currently has focus. This is acceptable — it is
+    the same behaviour as the previous stable fix.
     """
     def __init__(self, logger=None):
         self.logger = logger
@@ -371,8 +377,24 @@ class GlobalKeyRecorder:
         self._held:  set       = set()
         self._token = 0
         self.results: queue.Queue = queue.Queue()
-        self.errors: queue.Queue = queue.Queue()
+        self.errors:  queue.Queue = queue.Queue()
+
+        # Single long-lived listener — started here, never restarted.
         self._listener = None
+        self._log("recorder_listener", "starting permanent pynput keyboard listener (suppress=False)")
+        try:
+            self._listener = pynput_kb.Listener(
+                on_press=self._on_press,
+                on_release=self._on_release,
+                suppress=False,
+            )
+            self._listener.daemon = True
+            self._listener.start()
+            self._log("recorder_listener", f"started running={self.running}")
+        except Exception as exc:
+            self._listener = None
+            self.errors.put(str(exc))
+            self._log_exception("recorder_listener_error", exc)
 
     def _log(self, event, message):
         if self.logger is not None:
@@ -382,33 +404,6 @@ class GlobalKeyRecorder:
         if self.logger is not None:
             self.logger.exception(event, exc)
 
-    def _start_listener(self):
-        # Stop any old recorder hook before starting a fresh suppressed hook.
-        self._stop_listener()
-        try:
-            self._log("recorder_listener", "starting suppressed pynput keyboard listener")
-            self._listener = pynput_kb.Listener(
-                on_press=self._on_press,
-                on_release=self._on_release,
-                suppress=True,
-            )
-            self._listener.daemon = True
-            self._listener.start()
-            self._log("recorder_listener", f"started running={self.running} suppress=True")
-        except Exception as exc:
-            self._listener = None
-            self.errors.put(str(exc))
-            self._log_exception("recorder_listener_error", exc)
-
-    def _stop_listener(self):
-        listener = self._listener
-        self._listener = None
-        if listener is not None:
-            try:
-                listener.stop()
-            except Exception:
-                pass
-
     @property
     def running(self):
         try:
@@ -417,20 +412,20 @@ class GlobalKeyRecorder:
             return False
 
     def arm(self, token):
+        """Mark the recorder as ready to capture the next keypress."""
         with self._lock:
             self._armed = True
             self._chord = []
             self._held  = set()
             self._token = token
-        self._start_listener()
-        self._log("recorder_arm", f"token={token} running={self.running} suppress=True")
+        self._log("recorder_arm", f"token={token} running={self.running}")
 
     def cancel(self):
+        """Disarm without stopping the listener."""
         with self._lock:
             self._armed = False
             self._chord = []
             self._held  = set()
-        self._stop_listener()
         self._log("recorder_cancel", "global recorder cancelled")
 
     def _canonical(self, key):
@@ -455,7 +450,7 @@ class GlobalKeyRecorder:
         try:
             with self._lock:
                 if not self._armed:
-                    return False
+                    return
                 name = self._canonical(key)
                 if key not in self._held:
                     self._held.add(key)
@@ -470,28 +465,22 @@ class GlobalKeyRecorder:
 
     def _on_release(self, key):
         try:
-            should_stop = False
             with self._lock:
                 if not self._armed:
-                    return False
+                    return
                 if key in MODIFIER_KEYS:
-                    return False
+                    return
                 chord = "+".join(self._chord)
                 token = self._token
                 self._armed = False
                 self._chord = []
                 self._held  = set()
-                should_stop = True
-            self._log("recorder_result", f"token={token} chord={chord} source=global_suppressed")
-            self.results.put((token, chord, "global_suppressed"))
-            if should_stop:
-                # Stop shortly after returning so the final release is swallowed too.
-                threading.Timer(0.05, self._stop_listener).start()
-            return False
+            self._log("recorder_result", f"token={token} chord={chord} source=global")
+            self.results.put((token, chord, "global"))
+            # Listener keeps running — do NOT call stop() here.
         except Exception as exc:
             self.errors.put(str(exc))
             self._log_exception("recorder_key_release_error", exc)
-            return False
 
 
 # ── BLE SCAN DIALOG ────────────────────────────────────────────────────────────
@@ -667,6 +656,8 @@ class GesturePuckApp:
         self._local_chord: list[str] = []
         self._local_held: set[str] = set()
 
+        # GlobalKeyRecorder starts its permanent listener here, at app boot,
+        # on the main thread — safe on macOS.
         self.recorder     = GlobalKeyRecorder(self.logger)
         self.status       = tk.StringVar(value="NOT CONNECTED")
         self.last_gesture = tk.StringVar(value="—")
@@ -954,16 +945,10 @@ class GesturePuckApp:
                lambda g=gesture: self._start_record(g),
                bg=SURFACE, fg=REC_CLR).pack(side="left", padx=(0, 4))
 
-        tk.Label(
-            row, text="AUTO", bg=row_bg, fg=SAVE_CLR,
-            font=FONT_BADGE, padx=8, pady=2,
-        ).pack(side="left", padx=(0, 4))
-
-        def _autosave_row(*_args, g=gesture, mv=mvar, lv=lvar):
-            self._save(g, mv.get(), lv.get())
-
-        lvar.trace_add("write", _autosave_row)
-        mvar.trace_add("write", _autosave_row)
+        #mk_btn(row, "✓  SAVE",
+               #lambda g=gesture, mv=mvar, lv=lvar: self._save(
+                   #g, mv.get(), lv.get()),
+               #bg=SURFACE, fg=SAVE_CLR).pack(side="left", padx=(0, 4))
 
         mk_btn(row, "✕",
                lambda g=gesture: self._delete(g),
@@ -1670,7 +1655,7 @@ class GesturePuckApp:
         self.root.focus_set()
         self.recorder.arm(token)
         if not self.recorder.running:
-            self.logger.log("record_warning", "suppressed pynput listener is not running; using Tk focused-window fallback")
+            self.logger.log("record_warning", "pynput listener is not running; using Tk focused-window fallback")
 
     def _canonical_tk_key(self, event):
         keysym = (event.keysym or "").lower()
@@ -1759,12 +1744,16 @@ class GesturePuckApp:
         except queue.Empty:
             pass
         self.root.after(50, self._poll_recorder)
+        self.root.after(1000, self._periodic_save)
 
     # ── CRUD ──────────────────────────────────────────────────────────────────
-    def _save(self, gesture, macro, label):
-        self.logger.log("mapping_save", f"page={self.current_page} gesture={gesture} label={label!r} macro={macro!r}")
-        self.mappings.setdefault(self.current_page, {})[gesture] = {
-            "label": label, "macro": macro}
+    def _periodic_save(self):
+        for gesture, mvar in self._macro_vars.items():
+            self.mappings.setdefault(self.current_page, {})\
+                .setdefault(gesture, {})["macro"] = mvar.get()
+        for gesture, lvar in self._label_vars.items():
+            self.mappings.setdefault(self.current_page, {})\
+                .setdefault(gesture, {})["label"] = lvar.get()
         store.save(self.mappings)
 
     def _delete(self, gesture):
