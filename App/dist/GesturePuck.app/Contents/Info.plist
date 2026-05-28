@@ -9,7 +9,7 @@
 	<key>CFBundleIconFile</key>
 	<string>icon-windowed.icns</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.gesturepuck.app</string>
+	<string>GesturePuck</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -18,16 +18,6 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>0.0.0</string>
-	<key>LSUIElement</key>
-	<false/>
-	<key>NSAccessibilityUsageDescription</key>
-	<string>GesturePuck needs Accessibility access to simulate key presses.</string>
-	<key>NSAppleEventsUsageDescription</key>
-	<string>GesturePuck needs this to detect which app is active.</string>
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>GesturePuck needs Bluetooth to connect to your device.</string>
-	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>GesturePuck needs Bluetooth to connect to your device.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 </dict>
