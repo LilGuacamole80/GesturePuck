@@ -69,6 +69,7 @@ N_PIXELS = GRID * GRID
 BINARY_MAGIC = b"MLD1"
 BINARY_PACKET_SIZE = len(BINARY_MAGIC) + 4 + 4 + 4 + N_PIXELS * 2 + 2
 TEXT_LINE_BUFFER_LIMIT = 4096
+DEFAULT_SENSOR_CALIBRATION_FILE = "sensor_calibration.json"
 GESTURE_NAMES = [
     "swipe_left",
     "swipe_right",
@@ -126,15 +127,17 @@ class FramePacket:
 
 @dataclass
 class DualFramePacket:
-    """Carries frames from both ToF sensors plus APDS proximity reading."""
+    """Carries frames from the ToF sensors plus APDS proximity reading."""
     host_t: float
     tof1: np.ndarray                    # 8x8 float mm — primary (used for gesture pipeline)
     tof2: np.ndarray                    # 8x8 float mm — companion view
+    tof3: Optional[np.ndarray] = None    # 8x8 float mm — optional third view
     proximity: int = 0                  # APDS-9930 raw proximity value
     hand_present: bool = False          # True when proximity > HAND_THRESHOLD
     seq: Optional[int] = None
     device_ms: Optional[int] = None
     primary_sensor: int = 1
+    available_sensors: Tuple[int, ...] = (1, 2)
 
     def to_frame_packet(self) -> FramePacket:
         """Convert to single-sensor FramePacket for the gesture pipeline."""
@@ -146,6 +149,34 @@ class DualFramePacket:
             device_ms=self.device_ms,
             protocol=protocol,
         )
+
+    def sensor_frame_packets(self) -> List[Tuple[int, FramePacket]]:
+        """Return each finite ToF frame as a FramePacket for per-sensor tracking."""
+        frames: List[Tuple[int, Optional[np.ndarray]]] = [
+            (1, self.tof1),
+            (2, self.tof2),
+            (3, self.tof3),
+        ]
+        out: List[Tuple[int, FramePacket]] = []
+        allowed = set(self.available_sensors or ())
+        for sensor_id, values in frames:
+            if allowed and sensor_id not in allowed:
+                continue
+            if values is None or not np.any(np.isfinite(values)):
+                continue
+            out.append(
+                (
+                    sensor_id,
+                    FramePacket(
+                        host_t=self.host_t,
+                        values=values.copy(),
+                        seq=self.seq,
+                        device_ms=self.device_ms,
+                        protocol=f"tof{sensor_id}",
+                    ),
+                )
+            )
+        return out
 
 
 @dataclass
@@ -172,6 +203,8 @@ class Measurement:
     field_dx: float = 0.0
     field_dy: float = 0.0
     field_quality: float = 0.0
+    source_sensors: Tuple[int, ...] = ()
+    fusion: Dict[str, object] = field(default_factory=dict)
 
 
 @dataclass
@@ -186,6 +219,8 @@ class TrackSample:
     field_dx: float = 0.0
     field_dy: float = 0.0
     field_quality: float = 0.0
+    visible_sensor_count: int = 1
+    source_sensor_count: int = 1
 
 
 @dataclass
@@ -304,6 +339,46 @@ def resolve_serial_debug_path(value: Optional[str]) -> Optional[Path]:
         stamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
         return path / f"serial_debug_{stamp}.log"
     return path
+
+
+def default_sensor_calibration_path() -> Path:
+    return Path(__file__).resolve().parent / DEFAULT_SENSOR_CALIBRATION_FILE
+
+
+def resolve_sensor_calibration_path(value: Optional[str]) -> Optional[Path]:
+    if value is None or str(value).lower() in {"", "off", "none", "false", "0"}:
+        return None
+    if str(value).lower() == "auto":
+        return default_sensor_calibration_path()
+    return Path(value).expanduser()
+
+
+def load_sensor_calibration(value: Optional[str]) -> Tuple[Optional[Path], Dict[int, np.ndarray], Dict[int, float]]:
+    path = resolve_sensor_calibration_path(value)
+    if path is None or not path.exists():
+        return path, {}, {}
+    with path.open("r", encoding="utf-8") as fh:
+        payload = json.load(fh)
+    sensors = payload.get("sensors", {}) if isinstance(payload, dict) else {}
+    transforms: Dict[int, np.ndarray] = {}
+    weights: Dict[int, float] = {}
+    for key, info in sensors.items():
+        try:
+            sensor_id = int(key)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(info, dict):
+            continue
+        matrix = np.asarray(info.get("matrix"), dtype=float)
+        if matrix.shape == (2, 3) and np.all(np.isfinite(matrix)):
+            transforms[sensor_id] = matrix
+        try:
+            weight = float(info.get("sensor_weight", info.get("weight", math.nan)))
+        except (TypeError, ValueError):
+            weight = math.nan
+        if np.isfinite(weight) and weight > 0:
+            weights[sensor_id] = float(np.clip(weight, 0.1, 2.0))
+    return path, transforms, weights
 
 
 def apply_orientation(frame: np.ndarray, *, flip_x: bool, flip_y: bool, transpose: bool) -> np.ndarray:
@@ -681,8 +756,126 @@ class DemoFrameSource:
     def close(self) -> None:
         pass
 
+
+class DiagnosticReplayFrameSource:
+    """Replay raw packets from DiagnosticLogger JSONL output."""
+
+    def __init__(self, path: str):
+        self.path = Path(path).expanduser()
+        self.records: List[Tuple[float, object]] = []
+        self.index = 0
+        self.started_at = 0.0
+        self.first_t = 0.0
+        self.frames_seen = 0
+        self._load()
+
+    def _load(self) -> None:
+        if not self.path.exists():
+            raise SystemExit(f"Replay log does not exist: {self.path}")
+        with self.path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if obj.get("type") != "frame":
+                    continue
+                packet_obj = obj.get("packet")
+                if not isinstance(packet_obj, dict):
+                    continue
+                packet = self._packet_from_obj(packet_obj)
+                if packet is not None:
+                    self.records.append((float(obj.get("t") or 0.0), packet))
+        if not self.records:
+            raise SystemExit(f"No replayable packet frames found in {self.path}")
+        self.first_t = self.records[0][0]
+
+    @staticmethod
+    def _array_from_values(values: object) -> Optional[np.ndarray]:
+        if not isinstance(values, list) or len(values) != N_PIXELS:
+            return None
+        arr = np.array([math.nan if v is None else float(v) for v in values], dtype=float)
+        return arr.reshape((GRID, GRID))
+
+    def _packet_from_obj(self, obj: Dict[str, object]):
+        packet_type = obj.get("type")
+        now = time.time()
+        seq = obj.get("seq")
+        device_ms = obj.get("device_ms")
+        if packet_type == "dual":
+            frames = obj.get("frames")
+            if not isinstance(frames, dict):
+                return None
+            arrays: Dict[int, np.ndarray] = {}
+            for key, values in frames.items():
+                try:
+                    sensor_id = int(key)
+                except (TypeError, ValueError):
+                    continue
+                arr = self._array_from_values(values)
+                if arr is not None:
+                    arrays[sensor_id] = arr
+            if not arrays:
+                return None
+            primary_sensor = int(obj.get("primary_sensor") or (1 if 1 in arrays else min(arrays)))
+            primary = arrays[primary_sensor] if primary_sensor in arrays else arrays[min(arrays)]
+            tof1 = arrays.get(1, primary)
+            tof2 = arrays.get(2, np.full_like(tof1, np.nan))
+            tof3 = arrays.get(3, np.full_like(tof1, np.nan))
+            return DualFramePacket(
+                host_t=now,
+                tof1=tof1,
+                tof2=tof2,
+                tof3=tof3,
+                proximity=int(obj.get("proximity") or 0),
+                hand_present=bool(obj.get("hand_present")),
+                seq=int(seq) if seq is not None else None,
+                device_ms=int(device_ms) if device_ms is not None else None,
+                primary_sensor=primary_sensor,
+                available_sensors=tuple(sorted(arrays)),
+            )
+        if packet_type == "frame":
+            values = self._array_from_values(obj.get("values"))
+            if values is None:
+                return None
+            return FramePacket(
+                host_t=now,
+                values=values,
+                seq=int(seq) if seq is not None else None,
+                device_ms=int(device_ms) if device_ms is not None else None,
+                protocol="replay",
+            )
+        return None
+
+    def start(self) -> None:
+        self.started_at = time.time()
+
+    def read_latest(self):
+        if self.index >= len(self.records):
+            return None
+        elapsed = time.time() - self.started_at
+        latest = None
+        while self.index < len(self.records):
+            rel_t, packet = self.records[self.index]
+            if rel_t - self.first_t > elapsed and latest is None:
+                break
+            if rel_t - self.first_t > elapsed:
+                break
+            self.index += 1
+            self.frames_seen += 1
+            if hasattr(packet, "host_t"):
+                packet.host_t = time.time()
+            latest = packet
+        return latest
+
+    def stats(self) -> str:
+        return f"replay frames={self.frames_seen}/{len(self.records)} path={self.path}"
+
+    def close(self) -> None:
+        pass
+
 # ---------------------------------------------------------------------------
-# Dual-sensor serial source  (GesturePuck firmware with APDS-9930 + 2x ToF)
+# Multi-sensor serial source  (GesturePuck firmware with APDS-9930 + 3x ToF)
 # ---------------------------------------------------------------------------
 
 # The preferred firmware stream sends:
@@ -690,6 +883,7 @@ class DemoFrameSource:
 #   MLD2 packets  — ToF #2 binary frames (same format, different magic)
 #   FRAME,seq,millis,64 values — compact ToF #1 CSV frames
 #   FRAME2,seq,millis,64 values — compact ToF #2 CSV frames
+#   FRAME3,seq,millis,64 values — compact ToF #3 CSV frames
 #   #PROX,<val>,<0|1>\n  — APDS-9930 proximity line
 #
 # The current bring-up sketch also prints human-readable debug text:
@@ -716,14 +910,14 @@ class DualSensorSerialFrameSource:
 
     MLD1 binary packets → ToF #1 (gesture pipeline primary)
     MLD2 binary packets → ToF #2 (companion heatmap)
+    FRAME3 CSV lines    → ToF #3 (third gesture/fusion view)
     #PROX text lines    → APDS-9930 proximity / hand-present flag
     FRAME CSV lines     → compact one-sensor bring-up stream
     debug text tables   → fallback parser for the serial-monitor bring-up sketch
 
-    A DualFramePacket is emitted each time a matching ToF #1 + ToF #2 pair
-    arrives with the same sequence number.  If the sequence numbers differ by
-    more than one (e.g. a sensor read failed) the most recent frame from each
-    sensor is used so the display never stalls.
+    A DualFramePacket is emitted from the latest available frames. The detector
+    fuses all finite ToF frames, so a missing or delayed sensor does not stall
+    classification.
     """
 
     def __init__(
@@ -749,9 +943,10 @@ class DualSensorSerialFrameSource:
         self.buf = bytearray()
 
         # Latest parsed frames from each sensor. The visualizer can run with one
-        # sensor; the second sensor is a companion view when available.
+        # sensor; second/third sensors become fusion views when available.
         self._pending1: Optional[FramePacket] = None
         self._pending2: Optional[FramePacket] = None
+        self._pending3: Optional[FramePacket] = None
 
         # Latest APDS state
         self._proximity: int = 0
@@ -768,6 +963,7 @@ class DualSensorSerialFrameSource:
         self.discarded_bytes = 0
         self.tof1_frames = 0
         self.tof2_frames = 0
+        self.tof3_frames = 0
         self.single_sensor_frames = 0
         self.prox_lines = 0
         self.hand_lines = 0
@@ -923,7 +1119,7 @@ class DualSensorSerialFrameSource:
             self._note("firmware", line)
             return
 
-        if line.startswith(("FRAME,", "FRAME1,", "FRAME2,")):
+        if line.startswith(("FRAME,", "FRAME1,", "FRAME2,", "FRAME3,")):
             self._handle_csv_frame_line(line)
             return
 
@@ -998,8 +1194,13 @@ class DualSensorSerialFrameSource:
         self._note("text", f"unrecognized line outside a ToF table: {line[:120]!r}")
 
     def _handle_csv_frame_line(self, line: str) -> None:
-        sensor = 2 if line.startswith("FRAME2,") else 1
-        if line.startswith(("FRAME1,", "FRAME2,")):
+        if line.startswith("FRAME3,"):
+            sensor = 3
+        elif line.startswith("FRAME2,"):
+            sensor = 2
+        else:
+            sensor = 1
+        if line.startswith(("FRAME1,", "FRAME2,", "FRAME3,")):
             parse_line = "FRAME," + line.split(",", 1)[1]
         else:
             parse_line = line
@@ -1012,13 +1213,15 @@ class DualSensorSerialFrameSource:
         if sensor == 1:
             self._pending1 = pkt
             self.tof1_frames += 1
-        else:
+        elif sensor == 2:
             self._pending2 = pkt
             self.tof2_frames += 1
+        else:
+            self._pending3 = pkt
+            self.tof3_frames += 1
         self.text_frames += 1
         self._note("tof-frame", f"ToF #{sensor} csv frame parsed seq={pkt.seq} {frame_stats(pkt.values)}")
-        if sensor == 1 or self._pending1 is None:
-            self._try_emit(primary_sensor=sensor)
+        self._try_emit(primary_sensor=sensor)
 
     def _begin_debug_frame(self, sensor: int) -> None:
         if sensor == 1:
@@ -1077,38 +1280,57 @@ class DualSensorSerialFrameSource:
     def _try_emit(self, primary_sensor: int = 1) -> None:
         """Emit a DualFramePacket from the latest available ToF data."""
         if self._pending1 is None and self._pending2 is None:
-            return
+            if self._pending3 is None:
+                return
 
         if self._pending1 is not None:
             primary = self._pending1
             tof1 = self._pending1.values
             tof2 = self._pending2.values if self._pending2 is not None else np.full_like(tof1, np.nan)
+            tof3 = self._pending3.values if self._pending3 is not None else np.full_like(tof1, np.nan)
             primary_sensor = 1
-        else:
+        elif self._pending2 is not None:
             primary = self._pending2
             tof1 = self._pending2.values
             tof2 = self._pending2.values
+            tof3 = self._pending3.values if self._pending3 is not None else np.full_like(tof1, np.nan)
             primary_sensor = 2
+        else:
+            primary = self._pending3
+            tof1 = self._pending3.values
+            tof2 = np.full_like(tof1, np.nan)
+            tof3 = self._pending3.values
+            primary_sensor = 3
 
-        if self._pending1 is None or self._pending2 is None:
+        available_sensors = tuple(
+            sensor_id
+            for sensor_id, pending in ((1, self._pending1), (2, self._pending2), (3, self._pending3))
+            if pending is not None
+        )
+
+        if len(available_sensors) < 3:
             self.single_sensor_frames += 1
 
-        mode = "paired" if self._pending1 is not None and self._pending2 is not None else "single-sensor"
+        mode = "paired" if len(available_sensors) >= 2 else "single-sensor"
+        if len(available_sensors) == 3:
+            mode = "three-sensor"
         dual = DualFramePacket(
             host_t=primary.host_t,
             tof1=tof1,
             tof2=tof2,
+            tof3=tof3,
             proximity=self._proximity,
             hand_present=self._hand_present,
             seq=primary.seq,
             device_ms=primary.device_ms,
             primary_sensor=primary_sensor,
+            available_sensors=available_sensors,
         )
         self.frames_seen += 1
         self._note(
             "emit",
-            f"{mode} dual packet #{self.frames_seen} primary=ToF#{primary_sensor} "
-            f"seq={primary.seq} proximity={self._proximity} hand={self._hand_present}",
+            f"{mode} packet #{self.frames_seen} primary=ToF#{primary_sensor} "
+            f"sensors={available_sensors} seq={primary.seq} proximity={self._proximity} hand={self._hand_present}",
         )
         if self.q.full():
             try:
@@ -1119,6 +1341,7 @@ class DualSensorSerialFrameSource:
             self.q.put_nowait(dual)
         except queue.Full:
             pass
+        return
 
     def read_latest(self) -> Optional[DualFramePacket]:
         latest = None
@@ -1133,7 +1356,7 @@ class DualSensorSerialFrameSource:
         last_part = f" last={self.last_event}" if self.last_event else ""
         return (
             f"dual bytes={self.bytes_seen} reads={self.raw_reads} frames={self.frames_seen} "
-            f"tof1={self.tof1_frames} tof2={self.tof2_frames} "
+            f"tof1={self.tof1_frames} tof2={self.tof2_frames} tof3={self.tof3_frames} "
             f"single={self.single_sensor_frames} "
             f"text={self.text_frames}/{self.text_lines} prox={self.prox_lines} hand={self.hand_lines} "
             f"bad={self.bad_lines} csum_err={self.checksum_errors} "
@@ -1475,6 +1698,213 @@ class SignalPipeline:
         self.background = (1.0 - alpha) * self.background + alpha * current
 
 
+class FusedSignalPipeline:
+    """
+    Runs one SignalPipeline per ToF sensor and fuses visible tracks.
+
+    This keeps the existing foreground/blob tracker intact while changing the
+    detector input from "ToF #1 only" to a confidence-weighted trajectory. The
+    current firmware does not expose ST target status/sigma/signal metadata, so
+    fusion confidence is based on the per-sensor blob quality already computed
+    by SignalPipeline.
+    """
+
+    DEFAULT_SENSOR_WEIGHTS = {1: 1.0, 2: 0.95, 3: 0.95}
+
+    def __init__(self, args: argparse.Namespace):
+        self.args = args
+        self.requested_fusion_mode = str(getattr(args, "fusion_mode", "auto") or "auto").lower()
+        self.sensor_calibration_path, self.sensor_transforms, calibration_weights = load_sensor_calibration(
+            getattr(args, "sensor_calibration", "auto")
+        )
+        self.calibrated_sensors = tuple(sorted(self.sensor_transforms))
+        if self.requested_fusion_mode == "auto":
+            self.fusion_mode = "weighted-centroid" if self.sensor_transforms else "best-track"
+        else:
+            self.fusion_mode = self.requested_fusion_mode
+        self._pipelines: Dict[int, SignalPipeline] = {}
+        self._sensor_weights = dict(self.DEFAULT_SENSOR_WEIGHTS)
+        self._sensor_weights.update(calibration_weights)
+
+    def start_calibration(self) -> None:
+        for pipeline in self._pipelines.values():
+            pipeline.start_calibration()
+
+    def _pipeline_for(self, sensor_id: int) -> SignalPipeline:
+        if sensor_id not in self._pipelines:
+            self._pipelines[sensor_id] = SignalPipeline(self.args)
+        return self._pipelines[sensor_id]
+
+    def process(self, packet) -> Measurement:
+        if isinstance(packet, DualFramePacket):
+            return self.process_dual(packet)
+        return self._pipeline_for(1).process(packet)
+
+    def process_dual(self, packet: DualFramePacket) -> Measurement:
+        sensor_packets = packet.sensor_frame_packets()
+        if not sensor_packets:
+            fallback = packet.to_frame_packet()
+            return self._pipeline_for(packet.primary_sensor).process(fallback)
+
+        processed: List[Tuple[int, Measurement]] = []
+        for sensor_id, frame_packet in sensor_packets:
+            frame_packet.protocol = f"fused-tof{sensor_id}"
+            measurement = self._pipeline_for(sensor_id).process(frame_packet)
+            self._apply_sensor_calibration(sensor_id, measurement)
+            processed.append((sensor_id, measurement))
+
+        primary_id = packet.primary_sensor if packet.primary_sensor in [sid for sid, _ in processed] else processed[0][0]
+        primary = next((m for sid, m in processed if sid == primary_id), processed[0][1])
+        visible_tracks: List[Tuple[int, Measurement, float]] = []
+        for sensor_id, measurement in processed:
+            if not (
+                measurement.visible
+                and np.isfinite(measurement.x)
+                and np.isfinite(measurement.y)
+                and np.isfinite(measurement.z)
+            ):
+                continue
+            sensor_weight = self._sensor_weights.get(sensor_id, 0.9)
+            weight = max(0.0, float(measurement.quality)) * sensor_weight
+            if weight > 0:
+                visible_tracks.append((sensor_id, measurement, weight))
+
+        sensor_meta = {
+            str(sensor_id): self._measurement_summary(
+                measurement,
+                sensor_weight=self._sensor_weights.get(sensor_id, 0.9),
+                calibrated=sensor_id in self.sensor_transforms,
+            )
+            for sensor_id, measurement in processed
+        }
+
+        if not visible_tracks:
+            primary.status = f"{primary.status}; fused 0/{len(processed)} visible sensors"
+            primary.source_sensors = tuple(sensor_id for sensor_id, _ in processed)
+            primary.fusion = {
+                "mode": "fallback",
+                "visible_sensors": [],
+                "available_sensors": list(primary.source_sensors),
+                "calibrated_sensors": list(self.calibrated_sensors),
+                "calibration_path": str(self.sensor_calibration_path) if self.sensor_transforms else None,
+                "requested_mode": self.requested_fusion_mode,
+                "sensor_measurements": sensor_meta,
+            }
+            primary.protocol = f"fused:{primary.protocol}"
+            return primary
+
+        total_weight = sum(weight for _, _, weight in visible_tracks)
+        if total_weight <= 0:
+            total_weight = 1.0
+
+        def weighted(attr: str, tracks: List[Tuple[int, Measurement, float]], denom: float) -> float:
+            return float(sum(getattr(m, attr) * weight for _, m, weight in tracks) / denom)
+
+        visible_ids = tuple(sensor_id for sensor_id, _, _ in visible_tracks)
+        best_id, best_measurement, _best_weight = max(visible_tracks, key=lambda item: item[2])
+        finite_nearest = [m.nearest for _, m, _ in visible_tracks if np.isfinite(m.nearest)]
+        if self.fusion_mode == "weighted-centroid":
+            centroid_tracks = visible_tracks
+            if self.sensor_transforms:
+                calibrated_tracks = [track for track in visible_tracks if track[0] in self.sensor_transforms]
+                if calibrated_tracks:
+                    centroid_tracks = calibrated_tracks
+            centroid_weight = sum(weight for _, _, weight in centroid_tracks) or total_weight
+            fused_x = weighted("x", centroid_tracks, centroid_weight)
+            fused_y = weighted("y", centroid_tracks, centroid_weight)
+            fused_z = weighted("z", centroid_tracks, centroid_weight)
+            fused_field_dx = weighted("field_dx", centroid_tracks, centroid_weight)
+            fused_field_dy = weighted("field_dy", centroid_tracks, centroid_weight)
+            fusion_mode = "confidence_weighted_centroid"
+        else:
+            # Without a geometric calibration between the three ToF views,
+            # averaging local grid coordinates can corrupt direction. Default to
+            # the strongest visible track while still using every sensor for
+            # fallback, support scoring, and diagnostics.
+            fused_x = best_measurement.x
+            fused_y = best_measurement.y
+            fused_z = best_measurement.z
+            fused_field_dx = best_measurement.field_dx
+            fused_field_dy = best_measurement.field_dy
+            fusion_mode = "confidence_weighted_best_track"
+
+        fused = Measurement(
+            t=packet.host_t,
+            raw=primary.raw,
+            filtered=primary.filtered,
+            valid=primary.valid,
+            foreground=np.maximum.reduce([m.foreground for _, m in processed]),
+            component=best_measurement.component,
+            visible=True,
+            x=fused_x,
+            y=fused_y,
+            z=fused_z,
+            nearest=float(min(finite_nearest)) if finite_nearest else math.nan,
+            area=int(sum(m.area for _, m, _ in visible_tracks)),
+            mass=float(sum(m.mass for _, m, _ in visible_tracks)),
+            quality=clamp01(sum(m.quality * weight for _, m, weight in visible_tracks) / total_weight),
+            status=(
+                f"fused {len(visible_tracks)}/{len(processed)} ToF sensors "
+                f"(best=ToF#{best_id}, primary=ToF#{primary_id})"
+            ),
+            seq=packet.seq,
+            device_ms=packet.device_ms,
+            read_us=primary.read_us,
+            protocol="fused-tof",
+            field_dx=fused_field_dx,
+            field_dy=fused_field_dy,
+            field_quality=clamp01(sum(m.field_quality * weight for _, m, weight in visible_tracks) / total_weight),
+            source_sensors=tuple(sensor_id for sensor_id, _ in processed),
+            fusion={
+                "mode": fusion_mode,
+                "visible_sensors": list(visible_ids),
+                "available_sensors": [sensor_id for sensor_id, _ in processed],
+                "calibrated_sensors": list(self.calibrated_sensors),
+                "calibration_path": str(self.sensor_calibration_path) if self.sensor_transforms else None,
+                "requested_mode": self.requested_fusion_mode,
+                "best_sensor": best_id,
+                "weights": {str(sensor_id): round_float(weight, 5) for sensor_id, _m, weight in visible_tracks},
+                "sensor_measurements": sensor_meta,
+            },
+        )
+        return fused
+
+    def _apply_sensor_calibration(self, sensor_id: int, measurement: Measurement) -> None:
+        matrix = self.sensor_transforms.get(sensor_id)
+        if matrix is None:
+            return
+        if not (measurement.visible and np.isfinite(measurement.x) and np.isfinite(measurement.y)):
+            return
+
+        x, y = float(measurement.x), float(measurement.y)
+        measurement.x = float(matrix[0, 0] * x + matrix[0, 1] * y + matrix[0, 2])
+        measurement.y = float(matrix[1, 0] * x + matrix[1, 1] * y + matrix[1, 2])
+
+        dx, dy = float(measurement.field_dx), float(measurement.field_dy)
+        measurement.field_dx = float(matrix[0, 0] * dx + matrix[0, 1] * dy)
+        measurement.field_dy = float(matrix[1, 0] * dx + matrix[1, 1] * dy)
+        measurement.status = f"{measurement.status}; calibrated ToF#{sensor_id}"
+
+    @staticmethod
+    def _measurement_summary(m: Measurement, *, sensor_weight: float, calibrated: bool = False) -> Dict[str, object]:
+        return {
+            "visible": bool(m.visible),
+            "x": finite_or_none(m.x),
+            "y": finite_or_none(m.y),
+            "z": finite_or_none(m.z),
+            "nearest": finite_or_none(m.nearest),
+            "area": int(m.area),
+            "mass": round_float(m.mass, 5),
+            "quality": round_float(m.quality, 5),
+            "sensor_weight": round_float(sensor_weight, 5),
+            "calibrated": calibrated,
+            "field_dx": round_float(m.field_dx, 5),
+            "field_dy": round_float(m.field_dy, 5),
+            "field_quality": round_float(m.field_quality, 5),
+            "status": m.status,
+        }
+
+
 def component_candidates(weights: np.ndarray, threshold: float) -> List[ComponentCandidate]:
     mask = weights > threshold
     visited = np.zeros_like(mask, dtype=bool)
@@ -1547,6 +1977,9 @@ class StrokeGestureDetector:
             "field_path": 0.0,
             "field_speed": 0.0,
             "field_quality": 0.0,
+            "sensor_support": 0.0,
+            "visible_sensor_mean": 0.0,
+            "source_sensor_mean": 0.0,
         }
 
     def clear(self) -> None:
@@ -1565,8 +1998,10 @@ class StrokeGestureDetector:
         if now < self.cooldown_until:
             self._decay_scores()
             if m.visible and m.quality >= self.args.enter_quality:
+                visible_sensor_count, source_sensor_count = self._sensor_counts(m)
                 self.last_visible_sample = TrackSample(
-                    m.t, m.x, m.y, m.z, m.area, m.mass, m.quality, m.field_dx, m.field_dy, m.field_quality
+                    m.t, m.x, m.y, m.z, m.area, m.mass, m.quality, m.field_dx, m.field_dy, m.field_quality,
+                    visible_sensor_count, source_sensor_count,
                 )
             else:
                 self.last_visible_sample = None
@@ -1574,7 +2009,11 @@ class StrokeGestureDetector:
             return None
 
         if m.visible and m.quality >= self.args.enter_quality:
-            s = TrackSample(m.t, m.x, m.y, m.z, m.area, m.mass, m.quality, m.field_dx, m.field_dy, m.field_quality)
+            visible_sensor_count, source_sensor_count = self._sensor_counts(m)
+            s = TrackSample(
+                m.t, m.x, m.y, m.z, m.area, m.mass, m.quality, m.field_dx, m.field_dy, m.field_quality,
+                visible_sensor_count, source_sensor_count,
+            )
             prev = self.last_visible_sample
             motion_energy = self._motion_energy(prev, s)
             self.last_visible_sample = s
@@ -1630,6 +2069,21 @@ class StrokeGestureDetector:
         xy_motion = math.hypot(curr.x - prev.x, curr.y - prev.y)
         z_motion = min(abs(curr.z - prev.z) / max(1.0, self.args.motion_z_scale_mm), self.args.motion_z_cap)
         return xy_motion + self.args.motion_field_weight * field_motion + self.args.motion_z_weight * z_motion
+
+    @staticmethod
+    def _sensor_counts(m: Measurement) -> Tuple[int, int]:
+        fusion = m.fusion or {}
+        visible = fusion.get("visible_sensors")
+        available = fusion.get("available_sensors")
+        if isinstance(visible, list):
+            visible_count = len(visible)
+        else:
+            visible_count = 1 if m.visible else 0
+        if isinstance(available, list):
+            source_count = len(available)
+        else:
+            source_count = len(m.source_sensors) if m.source_sensors else max(1, visible_count)
+        return max(0, visible_count), max(1, source_count)
 
     def _classify_and_reset(self, now: float, reason: str) -> Optional[GestureEvent]:
         stroke = self.active
@@ -1760,6 +2214,8 @@ class StrokeGestureDetector:
         fdxs = np.array([s.field_dx for s in samples], dtype=float)
         fdys = np.array([s.field_dy for s in samples], dtype=float)
         fqs = np.array([s.field_quality for s in samples], dtype=float)
+        visible_sensor_counts = np.array([s.visible_sensor_count for s in samples], dtype=float)
+        source_sensor_counts = np.array([s.source_sensor_count for s in samples], dtype=float)
 
         n = len(samples)
         k = max(1, int(round(n * self.args.endpoint_fraction)))
@@ -1789,6 +2245,10 @@ class StrokeGestureDetector:
         field_linearity = clamp01(field_xy_net / max(field_path, 1e-6)) if field_path > 0 else 0.0
         field_speed = field_xy_net / dt
         field_quality = clamp01(float(np.nanmean(field_weights)) / max(0.01, self.args.field_min_quality))
+        source_sensor_mean = max(1.0, float(np.nanmean(source_sensor_counts)))
+        visible_sensor_mean = float(np.nanmean(visible_sensor_counts))
+        sensor_support = clamp01(visible_sensor_mean / source_sensor_mean)
+        sensor_support_factor = 0.90 + 0.10 * sensor_support
         if n >= 3:
             t_rel = ts - ts[0]
             z_slope = float(np.polyfit(t_rel, zs, 1)[0])
@@ -1812,7 +2272,7 @@ class StrokeGestureDetector:
         swipe_base = clamp01((xy_net - self.args.swipe_cells * 0.55) / max(0.01, self.args.swipe_cells * 0.85))
         speed_score = clamp01(speed / max(0.01, self.args.min_swipe_speed))
         line_score = clamp01((linearity - 0.45) / 0.45)
-        qual_score = clamp01(quality / max(0.01, self.args.enter_quality))
+        qual_score = clamp01(quality / max(0.01, self.args.enter_quality)) * sensor_support_factor
         field_swipe_base = clamp01((field_xy_net - self.args.field_swipe_cells * 0.55) / max(0.01, self.args.field_swipe_cells * 0.85))
         field_speed_score = clamp01(field_speed / max(0.01, self.args.min_swipe_speed * 0.65))
         field_line_score = clamp01((field_linearity - 0.25) / 0.55)
@@ -1861,7 +2321,7 @@ class StrokeGestureDetector:
         pull_trend_score = 0.55 + 0.45 * clamp01((pull_trend - 0.45) / 0.45)
         depth_score_push = clamp01((push_amount - self.args.push_mm * 0.45) / max(1.0, self.args.push_mm * 0.7))
         depth_score_pull = clamp01((pull_amount - self.args.push_mm * 0.45) / max(1.0, self.args.push_mm * 0.7))
-        depth_quality = clamp01(quality / max(0.01, self.args.enter_quality))
+        depth_quality = clamp01(quality / max(0.01, self.args.enter_quality)) * sensor_support_factor
         scores["push"] = clamp01(depth_score_push * push_trend_score * lateral_stability_for_push * depth_quality)
         scores["pull"] = clamp01(depth_score_pull * pull_trend_score * lateral_stability_for_push * depth_quality)
 
@@ -1887,12 +2347,15 @@ class StrokeGestureDetector:
             "field_path": field_path,
             "field_speed": field_speed,
             "field_quality": field_quality,
+            "sensor_support": sensor_support,
+            "visible_sensor_mean": visible_sensor_mean,
+            "source_sensor_mean": source_sensor_mean,
         }
         details = (
             f"dx={dx:+.2f} dy={dy:+.2f} dz={dz:+.0f}mm "
             f"fdx={field_dx:+.2f} fdy={field_dy:+.2f} "
             f"dt={dt:.2f}s speed={speed:.2f}cells/s vz={z_slope:+.0f}mm/s "
-            f"lin={linearity:.2f} q={quality:.2f}"
+            f"lin={linearity:.2f} q={quality:.2f} sensors={visible_sensor_mean:.1f}/{source_sensor_mean:.1f}"
         )
         return scores, details, features
 
@@ -2027,6 +2490,7 @@ class CSVLogger:
                 "time", "seq", "device_ms", "read_us", "protocol",
                 "visible", "x", "y", "z", "nearest", "area", "mass", "quality",
                 "field_dx", "field_dy", "field_quality",
+                "source_sensors", "fusion_mode",
                 "event", "event_confidence", "status",
             ] + [f"raw_{i}" for i in range(N_PIXELS)] + [f"fg_{i}" for i in range(N_PIXELS)]
             self.writer.writerow(header)
@@ -2051,6 +2515,8 @@ class CSVLogger:
             f"{m.field_dx:.4f}",
             f"{m.field_dy:.4f}",
             f"{m.field_quality:.3f}",
+            "|".join(str(sensor_id) for sensor_id in m.source_sensors),
+            str(m.fusion.get("mode", "")) if m.fusion else "",
             event.name if event else "",
             f"{event.confidence:.3f}" if event else "",
             m.status,
@@ -2107,7 +2573,40 @@ class DiagnosticLogger:
         if flush:
             self.file.flush()
 
-    def write(self, m: Measurement, detector: StrokeGestureDetector, event: Optional[GestureEvent], source_stats: str) -> None:
+    def _packet_payload(self, packet) -> Optional[Dict[str, object]]:
+        if isinstance(packet, DualFramePacket):
+            frames: Dict[str, object] = {}
+            for sensor_id, frame_packet in packet.sensor_frame_packets():
+                frames[str(sensor_id)] = rounded_list(frame_packet.values.reshape(-1), 1)
+            return {
+                "type": "dual",
+                "seq": packet.seq,
+                "device_ms": packet.device_ms,
+                "primary_sensor": packet.primary_sensor,
+                "available_sensors": list(packet.available_sensors),
+                "proximity": packet.proximity,
+                "hand_present": packet.hand_present,
+                "frames": frames,
+            }
+        if isinstance(packet, FramePacket):
+            return {
+                "type": "frame",
+                "seq": packet.seq,
+                "device_ms": packet.device_ms,
+                "read_us": packet.read_us,
+                "protocol": packet.protocol,
+                "values": rounded_list(packet.values.reshape(-1), 1),
+            }
+        return None
+
+    def write(
+        self,
+        m: Measurement,
+        detector: StrokeGestureDetector,
+        event: Optional[GestureEvent],
+        source_stats: str,
+        packet=None,
+    ) -> None:
         if self.file is None:
             return
 
@@ -2132,6 +2631,8 @@ class DiagnosticLogger:
             "field_dx": round_float(m.field_dx, 5),
             "field_dy": round_float(m.field_dy, 5),
             "field_quality": round_float(m.field_quality, 5),
+            "source_sensors": list(m.source_sensors),
+            "fusion": m.fusion,
             "active_samples": 0 if active is None else len(active.samples),
             "active_duration": 0.0 if active is None else round_float(active.duration, 5),
             "active_motion_peak": 0.0 if active is None else round_float(active.motion_peak, 5),
@@ -2150,6 +2651,9 @@ class DiagnosticLogger:
             },
             "source": source_stats,
         }
+        packet_payload = self._packet_payload(packet)
+        if packet_payload is not None:
+            payload["packet"] = packet_payload
 
         if self.include_frames:
             payload["raw"] = rounded_list(m.raw.reshape(-1), 1)
@@ -2236,8 +2740,9 @@ class Visualizer:
         self.z_history: Deque[Tuple[float, float, float, float]] = deque(maxlen=args.history_len)
         self.fps_times: Deque[float] = deque(maxlen=90)
 
-        # Track the latest ToF #2 frame for display (only available in dual-sensor mode)
+        # Track latest companion frames for display/diagnostics (dual-sensor mode)
         self._latest_tof2: Optional[np.ndarray] = None
+        self._latest_tof3: Optional[np.ndarray] = None
         self._latest_proximity: int = 0
         self._latest_hand_present: bool = False
         self._dual_mode: bool = isinstance(source, DualSensorSerialFrameSource)
@@ -2381,7 +2886,7 @@ class Visualizer:
 
         title = "LiDAR Gesture Studio v2"
         if self._dual_mode:
-            title += " — Dual Sensor (ToF #1 gesture | ToF #2 companion)"
+            title += " — Multi Sensor (confidence-weighted fused track)"
         self.fig.suptitle(title)
 
     def on_key(self, event) -> None:
@@ -2420,16 +2925,16 @@ class Visualizer:
             self._update_status()
             return []
 
-        # Handle dual-sensor packets: extract ToF #2 data before processing ToF #1
+        # Handle multi-sensor packets: extract companion data before fusion.
         if isinstance(raw_packet, DualFramePacket):
             self._latest_tof2 = raw_packet.tof2
+            self._latest_tof3 = raw_packet.tof3
             self._latest_proximity = raw_packet.proximity
             self._latest_hand_present = raw_packet.hand_present
-            packet = raw_packet.to_frame_packet()
         else:
-            packet = raw_packet
+            self._latest_tof3 = None
 
-        m = self.pipeline.process(packet)
+        m = self.pipeline.process(raw_packet)
         self.last_measurement = m
         self.fps_times.append(m.t)
 
@@ -2443,7 +2948,7 @@ class Visualizer:
             )
 
         self.logger.write(m, event)
-        self.diag_logger.write(m, self.detector, event, self.source.stats())
+        self.diag_logger.write(m, self.detector, event, self.source.stats(), packet=raw_packet)
         if m.visible:
             self.trail.append((m.t, m.x, m.y))
             self.z_history.append((m.t, m.z, m.nearest, m.quality))
@@ -2611,7 +3116,12 @@ class Visualizer:
         dual_line = ""
         if self._dual_mode:
             hand_str = "YES" if self._latest_hand_present else "no"
-            dual_line = f"APDS-9930:     hand={hand_str}  proximity={self._latest_proximity}\n"
+            sensors = ",".join(str(s) for s in (m.source_sensors if m is not None else ())) or "--"
+            mode = str(m.fusion.get("mode", "")) if m is not None and m.fusion else ""
+            dual_line = (
+                f"APDS-9930:     hand={hand_str}  proximity={self._latest_proximity}\n"
+                f"ToF fusion:    sensors={sensors} {mode}\n"
+            )
         feature_lines = (
             f"{meas}\n"
             f"active stroke: {active_text}\n"
@@ -2661,6 +3171,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="ESP32 USB serial baud; defaults to 921600, or 115200 with --dual",
     )
     src.add_argument("--demo", action="store_true", help="Run without hardware using fake gesture data")
+    src.add_argument("--replay-log", default=None, help="Replay a DiagnosticLogger JSONL file instead of opening hardware")
     src.add_argument(
         "--dual", action="store_true",
         help=(
@@ -2780,6 +3291,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
     gest.add_argument("--hold-s", type=float, default=0.70)
     gest.add_argument("--hold-radius-cells", type=float, default=1.55)
     gest.add_argument("--hold-jitter-cells", type=float, default=0.55)
+    gest.add_argument(
+        "--fusion-mode",
+        choices=("auto", "best-track", "weighted-centroid"),
+        default="auto",
+        help="auto uses weighted-centroid when sensor calibration exists, otherwise best-track",
+    )
+    gest.add_argument(
+        "--sensor-calibration",
+        default="auto",
+        help="Per-sensor affine calibration JSON path; use 'auto' for App/sensor_calibration.json or 'off' to disable",
+    )
 
     out = p.add_argument_group("macros / output")
     out.add_argument("--enable-macros", action="store_true")
@@ -2814,7 +3336,9 @@ def configure_runtime_args(args: argparse.Namespace) -> argparse.Namespace:
 
 def main() -> int:
     args = build_arg_parser().parse_args()
-    if not args.demo and not args.port:
+    if args.replay_log:
+        args.dual = True
+    if not args.demo and not args.replay_log and not args.port:
         raise SystemExit("Provide --port /dev/cu.usbmodem2101, or use --demo")
 
     configure_runtime_args(args)
@@ -2826,7 +3350,9 @@ def main() -> int:
         log_reads=args.serial_debug_bytes,
     )
 
-    if args.demo:
+    if args.replay_log:
+        source = DiagnosticReplayFrameSource(args.replay_log)
+    elif args.demo:
         source = DemoFrameSource(max_mm=args.max_mm)
     elif args.dual:
         # Dual-sensor mode accepts both debug text at 115200 and binary MLD1/MLD2 streams.
@@ -2834,7 +3360,7 @@ def main() -> int:
     else:
         source = SerialFrameSource(args.port, args.baud, serial_debug=serial_debug)
 
-    pipeline = SignalPipeline(args)
+    pipeline = FusedSignalPipeline(args) if args.dual else SignalPipeline(args)
     detector = StrokeGestureDetector(args)
     macros = MacroManager(args.enable_macros)
     logger = CSVLogger(args.csv)
@@ -2843,10 +3369,12 @@ def main() -> int:
 
     source.start()
     print("LiDAR Gesture Studio v2 started.")
-    if args.dual:
-        print("Dual-sensor mode: APDS-9930 proximity + ToF #1 (gesture) + ToF #2 (companion).")
+    if args.replay_log:
+        print(f"Replay mode: {args.replay_log}")
+    elif args.dual:
+        print("Multi-sensor mode: APDS-9930 proximity + confidence-weighted ToF #1/#2/#3 fusion.")
         print(f"Reading {args.port} at {args.baud} baud.")
-        print("This accepts the current Serial Monitor debug tables and binary MLD1/MLD2 firmware.")
+        print("This accepts FRAME1/FRAME2/FRAME3 CSV streams plus legacy MLD1/MLD2/debug text.")
     else:
         print("Close PlatformIO Serial Monitor before using this script.")
     if args.calibration_frames > 0:

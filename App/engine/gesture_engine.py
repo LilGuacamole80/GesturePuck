@@ -13,6 +13,7 @@ import time
 from lidar_gesture_studio import (
     DualSensorSerialFrameSource,
     SerialFrameSource,
+    FusedSignalPipeline,
     SignalPipeline,
     StrokeGestureDetector,
     DemoFrameSource,
@@ -111,7 +112,7 @@ class GestureEngine:
             self._log("engine_source", "serial source opened")
             self._dual = False
 
-        self.pipeline = SignalPipeline(self.args)
+        self.pipeline = FusedSignalPipeline(self.args) if self.args.dual else SignalPipeline(self.args)
         self.detector = StrokeGestureDetector(self.args)
         self._thread = threading.Thread(target=self._loop, daemon=True)
 
@@ -178,18 +179,13 @@ class GestureEngine:
                     time.sleep(0.01)
                     continue
 
-                # DualSensorSerialFrameSource returns a DualFramePacket;
-                # SignalPipeline.process() expects a plain FramePacket (ToF #1).
-                if self._dual:
-                    packet = raw.to_frame_packet()
-                else:
-                    packet = raw   # DemoFrameSource already returns a FramePacket
+                packet = raw
 
                 self.frames_seen += 1
                 if self.frames_seen == 1:
                     self._emit_status("RECEIVING FRAMES")
                 elif self.frames_seen % 100 == 0:
-                    self._log("engine_frames", f"frames_seen={self.frames_seen} protocol={packet.protocol}")
+                    self._log("engine_frames", f"frames_seen={self.frames_seen} protocol={getattr(packet, 'protocol', 'dual')}")
 
                 with self._state_lock:
                     measurement = self.pipeline.process(packet)

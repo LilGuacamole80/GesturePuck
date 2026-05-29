@@ -21,6 +21,7 @@ static BLECharacteristic *pTxCharacteristic = nullptr;
 static bool bleConnected = false;
 
 static void handleHostCommand(String command);
+void printStatusThrottled(const char *message);
 
 class ServerCallbacks : public BLEServerCallbacks {
     void onConnect(BLEServer *pServer) override {
@@ -80,12 +81,18 @@ const uint32_t SERIAL_BAUD      = 115200;
 const uint32_t FRAME_PERIOD_MS  = 50;
 const uint32_t STATUS_PERIOD_MS = 1000;
 
-// Gesture capture window. APDS starts a stroke, but ToF continues briefly
-// after APDS drops so fast exits are still classified from a complete stroke.
-const uint32_t POST_HAND_CAPTURE_MS = 350;
+// Gesture capture window. ToF is the primary trigger; APDS remains a secondary
+// hint. ToF frames are buffered before trigger so fast gesture onsets are kept.
+const uint32_t POST_HAND_CAPTURE_MS = 650;
 const uint32_t MIN_CAPTURE_MS       = 180;
-const uint32_t MAX_CAPTURE_MS       = 1400;
+const uint32_t MAX_CAPTURE_MS       = 1800;
 const uint8_t  LED_BRIGHTNESS   = 8;
+
+const uint16_t TOF_TRIGGER_MAX_MM       = 1650;
+const uint16_t TOF_MOTION_DELTA_MM      = 85;
+const uint8_t  TOF_TRIGGER_MIN_CELLS    = 2;
+const uint8_t  TOF_MOTION_MIN_CELLS     = 2;
+const uint8_t  PRETRIGGER_FRAME_COUNT   = 8;
 
 const uint8_t  LED_UP_NUMBER    = 1;
 const bool     LED_CLOCKWISE_IS_RIGHT = true;
@@ -102,7 +109,15 @@ CRGB leds[NUM_LEDS];
 
 uint16_t frames[NUM_TOF][64];
 bool tofOK[NUM_TOF] = {false, false, false};
+bool currentTofOK[NUM_TOF] = {false, false, false};
 bool apdsOK = false;
+
+uint16_t pretriggerFrames[PRETRIGGER_FRAME_COUNT][NUM_TOF][64];
+bool pretriggerOK[PRETRIGGER_FRAME_COUNT][NUM_TOF];
+uint32_t pretriggerSeq[PRETRIGGER_FRAME_COUNT];
+uint32_t pretriggerMs[PRETRIGGER_FRAME_COUNT];
+uint8_t pretriggerHead = 0;
+uint8_t pretriggerCount = 0;
 
 uint32_t lastPrintMs  = 0;
 uint32_t lastStatusMs = 0;
@@ -113,6 +128,10 @@ bool captureSawHand = false;
 uint32_t captureId = 0;
 uint32_t captureStartMs = 0;
 uint32_t lastHandMs = 0;
+uint32_t lastActivityMs = 0;
+
+uint16_t prevFrames[NUM_TOF][64];
+bool havePrevFrame[NUM_TOF] = {false, false, false};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -274,6 +293,106 @@ void printFrameCSV(const char *prefix, uint32_t seq, uint32_t deviceMs, uint16_t
     printLine(buf);
 }
 
+void appendPretriggerFrame(uint32_t seq, uint32_t nowMs) {
+    uint8_t slot = pretriggerHead;
+    pretriggerSeq[slot] = seq;
+    pretriggerMs[slot] = nowMs;
+    for (uint8_t sensor = 0; sensor < NUM_TOF; sensor++) {
+        pretriggerOK[slot][sensor] = currentTofOK[sensor];
+        if (currentTofOK[sensor]) {
+            memcpy(pretriggerFrames[slot][sensor], frames[sensor], sizeof(frames[sensor]));
+        }
+    }
+    pretriggerHead = (pretriggerHead + 1) % PRETRIGGER_FRAME_COUNT;
+    if (pretriggerCount < PRETRIGGER_FRAME_COUNT) pretriggerCount++;
+}
+
+void printStoredFrame(uint8_t slot) {
+    for (uint8_t sensor = 0; sensor < NUM_TOF; sensor++) {
+        if (!pretriggerOK[slot][sensor]) continue;
+        char prefix[8];
+        snprintf(prefix, sizeof(prefix), "FRAME%u", sensor + 1);
+        printFrameCSV(prefix, pretriggerSeq[slot], pretriggerMs[slot], pretriggerFrames[slot][sensor]);
+    }
+}
+
+void flushPretriggerFrames() {
+    if (pretriggerCount == 0) return;
+    uint8_t start = (pretriggerHead + PRETRIGGER_FRAME_COUNT - pretriggerCount) % PRETRIGGER_FRAME_COUNT;
+    for (uint8_t i = 0; i < pretriggerCount; i++) {
+        uint8_t slot = (start + i) % PRETRIGGER_FRAME_COUNT;
+        printStoredFrame(slot);
+    }
+}
+
+void printCurrentFrames(uint32_t seq, uint32_t nowMs) {
+    for (uint8_t sensor = 0; sensor < NUM_TOF; sensor++) {
+        if (!currentTofOK[sensor]) continue;
+        char prefix[8];
+        snprintf(prefix, sizeof(prefix), "FRAME%u", sensor + 1);
+        printFrameCSV(prefix, seq, nowMs, frames[sensor]);
+    }
+}
+
+void readAllToFSensors() {
+    for (uint8_t i = 0; i < NUM_TOF; i++) {
+        currentTofOK[i] = false;
+        char errMsg[32];
+        if (!tofOK[i]) {
+            snprintf(errMsg, sizeof(errMsg), "#ERR,TOF%u,init_failed", i + 1);
+            printStatusThrottled(errMsg);
+            continue;
+        }
+        if (!muxSelect(TOF_CHANNELS[i])) {
+            snprintf(errMsg, sizeof(errMsg), "#ERR,TOF%u,mux_select_failed", i + 1);
+            printStatusThrottled(errMsg);
+            continue;
+        }
+        uint8_t err = tofs[i]->getAllData(frames[i]);
+        if (err == 0) {
+            currentTofOK[i] = true;
+        } else {
+            snprintf(errMsg, sizeof(errMsg), "#ERR,TOF%u,read_failed", i + 1);
+            printStatusThrottled(errMsg);
+        }
+    }
+    muxDisableAll();
+}
+
+bool detectToFActivity() {
+    uint8_t activeCells = 0;
+    uint8_t movingCells = 0;
+    bool anyCurrentFrame = false;
+    bool anyPreviousFrame = false;
+
+    for (uint8_t sensor = 0; sensor < NUM_TOF; sensor++) {
+        if (!currentTofOK[sensor]) continue;
+        anyCurrentFrame = true;
+        anyPreviousFrame = anyPreviousFrame || havePrevFrame[sensor];
+
+        for (int i = 0; i < 64; i++) {
+            uint16_t curr = frames[sensor][i];
+            bool currActive = curr > 0 && curr <= TOF_TRIGGER_MAX_MM;
+            if (currActive) activeCells++;
+
+            if (havePrevFrame[sensor]) {
+                uint16_t prev = prevFrames[sensor][i];
+                bool prevActive = prev > 0 && prev <= TOF_TRIGGER_MAX_MM;
+                uint16_t delta = curr > prev ? curr - prev : prev - curr;
+                if ((currActive || prevActive) && delta >= TOF_MOTION_DELTA_MM) movingCells++;
+            }
+        }
+
+        memcpy(prevFrames[sensor], frames[sensor], sizeof(prevFrames[sensor]));
+        havePrevFrame[sensor] = true;
+    }
+
+    if (!anyCurrentFrame) return false;
+
+    bool activeEnough = activeCells >= TOF_TRIGGER_MIN_CELLS;
+    bool movingEnough = movingCells >= TOF_MOTION_MIN_CELLS;
+    return activeEnough && (!anyPreviousFrame || movingEnough || captureActive);
+}
 
 void printCaptureState(const char *state, uint32_t id, uint32_t nowMs, const char *reason) {
     char buf[80];
@@ -281,39 +400,45 @@ void printCaptureState(const char *state, uint32_t id, uint32_t nowMs, const cha
     printLine(buf);
 }
 
-void updateCaptureWindow(bool handPresent, uint32_t nowMs) {
-    if (handPresent) {
-        lastHandMs = nowMs;
+bool updateCaptureWindow(bool handPresent, bool tofActivity, uint32_t nowMs) {
+    bool activity = handPresent || tofActivity;
+    if (activity) {
+        lastActivityMs = nowMs;
+        if (handPresent) {
+            lastHandMs = nowMs;
+        }
         if (!captureActive) {
             captureActive = true;
-            captureSawHand = true;
+            captureSawHand = handPresent;
             captureStartMs = nowMs;
             captureId++;
-            printCaptureState("START", captureId, nowMs, "apds_on");
+            printCaptureState("START", captureId, nowMs, handPresent ? "apds_on" : "tof_motion");
+            return true;
         } else {
-            captureSawHand = true;
+            captureSawHand = captureSawHand || handPresent;
         }
-        return;
+        return false;
     }
 
-    if (!captureActive) return;
+    if (!captureActive) return false;
 
     uint32_t sinceStart = nowMs - captureStartMs;
-    uint32_t sinceHand = nowMs - lastHandMs;
+    uint32_t sinceActivity = nowMs - lastActivityMs;
 
-    // Keep reading after APDS releases. This is the important part for fast
+    // Keep streaming after ToF/APDS activity releases. This is important for fast
     // swipes: the last ToF frames often carry the exit direction even after
-    // APDS proximity already fell below threshold.
+    // proximity/motion already fell below threshold.
     bool minWindowDone = sinceStart >= MIN_CAPTURE_MS;
-    bool tailDone = sinceHand >= POST_HAND_CAPTURE_MS;
+    bool tailDone = sinceActivity >= POST_HAND_CAPTURE_MS;
     bool tooLong = sinceStart >= MAX_CAPTURE_MS;
 
     if ((minWindowDone && tailDone) || tooLong) {
-        const char *reason = tooLong ? "max_window" : "post_apds_tail_done";
+        const char *reason = tooLong ? "max_window" : "post_activity_tail_done";
         printCaptureState("END", captureId, nowMs, reason);
         captureActive = false;
         captureSawHand = false;
     }
+    return false;
 }
 
 void printStatusThrottled(const char *message) {
@@ -437,49 +562,39 @@ void loop() {
 
     bool handPresent = false;
     uint16_t proximity = 0;
+    bool sensorError = false;
 
     if (apdsOK) {
         if (apds.readProximity(proximity)) {
             handPresent = proximity > HAND_THRESHOLD;
-            setRingColor(handPresent ? CRGB::Green : CRGB::Red);
         } else {
             printStatusThrottled("#ERR,APDS,read_failed");
-            setRingColor(CRGB::Blue);
+            sensorError = true;
         }
     } else {
         printStatusThrottled("#ERR,APDS,init_failed");
+        sensorError = true;
+    }
+
+    // ToF is read every frame so it can trigger capture and fill the pre-trigger
+    // history. Serial/BLE output is still emitted only during active capture.
+    readAllToFSensors();
+    bool tofActivity = detectToFActivity();
+    appendPretriggerFrame(frameSeq, lastPrintMs);
+
+    if (sensorError) {
         setRingColor(CRGB::Blue);
+    } else {
+        setRingColor((handPresent || tofActivity || captureActive) ? CRGB::Green : CRGB::Red);
     }
 
     printProximity(proximity, handPresent);
-    updateCaptureWindow(handPresent, lastPrintMs);
+    bool captureStarted = updateCaptureWindow(handPresent, tofActivity, lastPrintMs);
 
-    // Read all ToF sensors during the whole gesture capture, including the
-    // short tail after APDS drops. Do not read ToF when no capture is active.
-    if (captureActive) {
-        for (uint8_t i = 0; i < NUM_TOF; i++) {
-            char errMsg[32];
-            if (!tofOK[i]) {
-                snprintf(errMsg, sizeof(errMsg), "#ERR,TOF%u,init_failed", i + 1);
-                printStatusThrottled(errMsg);
-                continue;
-            }
-            if (!muxSelect(TOF_CHANNELS[i])) {
-                snprintf(errMsg, sizeof(errMsg), "#ERR,TOF%u,mux_select_failed", i + 1);
-                printStatusThrottled(errMsg);
-                continue;
-            }
-            uint8_t err = tofs[i]->getAllData(frames[i]);
-            if (err == 0) {
-                char prefix[8];
-                snprintf(prefix, sizeof(prefix), "FRAME%u", i + 1);
-                printFrameCSV(prefix, frameSeq, millis(), frames[i]);
-            } else {
-                snprintf(errMsg, sizeof(errMsg), "#ERR,TOF%u,read_failed", i + 1);
-                printStatusThrottled(errMsg);
-            }
-        }
-        muxDisableAll();
+    if (captureStarted) {
+        flushPretriggerFrames();
+    } else if (captureActive) {
+        printCurrentFrames(frameSeq, lastPrintMs);
     }
 
     frameSeq++;

@@ -9,12 +9,14 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import ttk, messagebox
 
+import numpy as np
 from pynput import keyboard as pynput_kb
 
 from engine.active_app import get_mapped_app
 from engine.gesture_engine import GestureEngine
 from lidar_gesture_studio import (
-    SignalPipeline,
+    DualFramePacket,
+    FusedSignalPipeline,
     StrokeGestureDetector,
     build_arg_parser,
     configure_runtime_args,
@@ -641,6 +643,8 @@ class GesturePuckApp:
         self._ble_last_quality = 0.0
         self._ble_last_measurement_status = ""
         self._ble_is_calibrating = False
+        self._ble_pending_frames = {}
+        self._ble_seen_frame3 = False
         self._serial_is_calibrating = False
         self._ready_token = 0
         self._ble_state_lock = threading.RLock()
@@ -1138,6 +1142,7 @@ class GesturePuckApp:
                     self._ble_pipeline.start_calibration()
                     self._ble_detector.clear()
                     self._ble_is_calibrating = True
+                    self._ble_pending_frames = {}
                     self._ble_last_visible = False
                     self._ble_last_quality = 0.0
                     self._ble_last_measurement_status = "calibrating"
@@ -1166,7 +1171,7 @@ class GesturePuckApp:
         args.serial_debug_log = self.serial_debug_log
         args.serial_debug_bytes = self.serial_debug_bytes
         configure_runtime_args(args)
-        return SignalPipeline(args), StrokeGestureDetector(args)
+        return FusedSignalPipeline(args), StrokeGestureDetector(args)
 
     def _start_ble_engine(self, ble_addr: str):
         """
@@ -1199,6 +1204,8 @@ class GesturePuckApp:
             self._ble_last_quality = 0.0
             self._ble_last_measurement_status = ""
             self._ble_is_calibrating = False
+            self._ble_pending_frames = {}
+            self._ble_seen_frame3 = False
 
         def task():
             try:
@@ -1237,14 +1244,43 @@ class GesturePuckApp:
         self._ui_events.put(("status", self._clean_status_text(text), TEXT_MED))
 
     def _parse_ble_frame_line(self, line: str):
-        """Parse FRAME/FRAME1/FRAME2 from BLE. The classifier uses ToF #1."""
-        if line.startswith("FRAME2,"):
-            # Current classifier only uses the primary ToF frame. Keep ignoring
-            # ToF #2 until the model/classifier is updated for two sensors.
-            return None
-        if line.startswith("FRAME1,"):
+        """Parse FRAME/FRAME1/FRAME2/FRAME3 from BLE."""
+        if line.startswith("FRAME3,"):
+            sensor_id = 3
             line = "FRAME," + line.split(",", 1)[1]
-        return parse_frame_line(line)
+        elif line.startswith("FRAME2,"):
+            sensor_id = 2
+            line = "FRAME," + line.split(",", 1)[1]
+        elif line.startswith("FRAME1,"):
+            sensor_id = 1
+            line = "FRAME," + line.split(",", 1)[1]
+        else:
+            sensor_id = 1
+        packet = parse_frame_line(line)
+        if packet is None:
+            return None
+        return sensor_id, packet
+
+    def _build_ble_fused_packet(self, primary_sensor: int, primary_packet):
+        pending = self._ble_pending_frames
+        primary = pending.get(primary_sensor) or primary_packet
+        tof1_packet = pending.get(1) or primary
+        tof1 = tof1_packet.values
+        tof2 = pending[2].values if 2 in pending else np.full_like(tof1, np.nan)
+        tof3 = pending[3].values if 3 in pending else np.full_like(tof1, np.nan)
+        available = tuple(sensor_id for sensor_id in (1, 2, 3) if sensor_id in pending)
+        return DualFramePacket(
+            host_t=primary.host_t,
+            tof1=tof1,
+            tof2=tof2,
+            tof3=tof3,
+            proximity=self._ble_last_proximity,
+            hand_present=self._ble_last_hand_present,
+            seq=primary.seq,
+            device_ms=primary.device_ms,
+            primary_sensor=1 if 1 in pending else primary_sensor,
+            available_sensors=available,
+        )
 
     def _on_ble_line(self, line: str):
         """
@@ -1252,7 +1288,8 @@ class GesturePuckApp:
         Supported lines:
           FRAME,<seq>,<ms>,<64 values…>   -> parsed and classified locally
           FRAME1,<seq>,<ms>,<64 values…>  -> parsed and classified locally
-          FRAME2,<seq>,<ms>,<64 values…>  -> currently ignored by classifier
+          FRAME2,<seq>,<ms>,<64 values…>  -> parsed and fused locally
+          FRAME3,<seq>,<ms>,<64 values…>  -> parsed and fused locally
           #PROX,<value>,<hand>             -> status/diagnostics
           GESTURE,<name>,<confidence>     -> optional direct firmware gesture
         """
@@ -1288,21 +1325,31 @@ class GesturePuckApp:
                     self.logger.log("ble_bad_gesture", line[:120])
             return
 
-        if not line.startswith(("FRAME,", "FRAME1,", "FRAME2,")):
+        if not line.startswith(("FRAME,", "FRAME1,", "FRAME2,", "FRAME3,")):
             # Keep setup chatter out of the UI, but leave it in the log.
             return
 
-        packet = self._parse_ble_frame_line(line)
-        if packet is None:
+        parsed = self._parse_ble_frame_line(line)
+        if parsed is None:
             return
+        sensor_id, packet = parsed
 
         try:
             with self._ble_state_lock:
                 if self._ble_pipeline is None or self._ble_detector is None:
                     self._ble_pipeline, self._ble_detector = self._make_ble_classifier()
+                self._ble_pending_frames[sensor_id] = packet
+                if sensor_id == 3:
+                    self._ble_seen_frame3 = True
+                should_classify = line.startswith("FRAME,") or sensor_id == 3 or (
+                    sensor_id == 2 and not self._ble_seen_frame3
+                )
+                if not should_classify:
+                    return
+                fused_packet = self._build_ble_fused_packet(sensor_id, packet)
                 self._ble_frames_seen += 1
                 frames_seen = self._ble_frames_seen
-                measurement = self._ble_pipeline.process(packet)
+                measurement = self._ble_pipeline.process(fused_packet)
                 event = self._ble_detector.update(measurement)
 
             # First valid frame means the puck stream is alive. Show loading,
@@ -1353,6 +1400,8 @@ class GesturePuckApp:
             self._ble_is_calibrating = False
             self._ble_pipeline = None
             self._ble_detector = None
+            self._ble_pending_frames = {}
+            self._ble_seen_frame3 = False
             self._ble_frames_seen = 0
             self._ble_lines_seen = 0
             self._ble_prox_seen = 0
