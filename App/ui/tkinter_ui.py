@@ -24,6 +24,7 @@ from lidar_gesture_studio import (
 )
 from engine.packs import ModeManager
 from ui.pack_panel import render_pack_page, render_pack_sidebar_section
+from engine import pack_store
 
 
 APP_DIR = Path(__file__).resolve().parents[1]
@@ -835,6 +836,8 @@ class GesturePuckApp:
             self.mode_manager,
             self._nav_btns,
             on_show_pack=self._show_pack_page,
+            on_import_done=self._on_pack_imported,
+            root=self.root,
         )
         tk.Frame(body, bg=BORDER, width=1).pack(side="left", fill="y")
 
@@ -1845,6 +1848,7 @@ class GesturePuckApp:
                 pack,
                 self.mode_manager,
                 on_mode_change=self._on_mode_change,
+                on_remove=self._on_pack_removed,
             )
 
     def _on_mode_change(self):
@@ -1853,12 +1857,23 @@ class GesturePuckApp:
             self._set_status(f"{pack.icon} {pack.name.upper()} ACTIVE", ACCENT2)
         else:
             self._set_status("Default Mode", TEXT_MED)
-    # Refresh sidebar to update active indicators
+        self._rebuild_ui_keep_page()
+
+    def _on_pack_imported(self, pack):
+        self.logger.log("pack_imported", f"id={pack.id!r} name={pack.name!r}")
+        self._rebuild_ui_keep_page()
+ 
+    def _on_pack_removed(self, pack_id: str):
+        self.logger.log("pack_removed", f"id={pack_id!r}")
+        self._rebuild_ui_keep_page(fallback_page="Global")
+ 
+    def _rebuild_ui_keep_page(self, fallback_page: str | None = None):
+        page = fallback_page or self.current_page
         for w in self.root.winfo_children():
             w.destroy()
         self._nav_btns = {}
         self._build_ui()
-        self._show_page(self.current_page)
+        self._show_page(page)
 
 
 # ── ENTRY POINT ────────────────────────────────────────────────────────────────

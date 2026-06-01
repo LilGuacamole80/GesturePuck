@@ -2249,9 +2249,34 @@ class StrokeGestureDetector:
         visible_sensor_mean = float(np.nanmean(visible_sensor_counts))
         sensor_support = clamp01(visible_sensor_mean / source_sensor_mean)
         sensor_support_factor = 0.90 + 0.10 * sensor_support
+        
         if n >= 3:
+            
+
+
             t_rel = ts - ts[0]
-            z_slope = float(np.polyfit(t_rel, zs, 1)[0])
+
+
+            print("t_rel:", t_rel)
+            print("zs:", zs)
+
+            print("len(t_rel) =", len(t_rel))
+            print("len(zs) =", len(zs))
+
+            print("t_rel finite:", np.isfinite(t_rel).all())
+            print("zs finite:", np.isfinite(zs).all())
+
+            print("unique t_rel:", len(np.unique(t_rel)))
+
+
+            t_span = t_rel[-1] - t_rel[0]
+            if len(t_rel) < 2 or t_span == 0.0 or not np.isfinite(t_span):
+                z_slope = 0.0
+            else:
+                try:
+                    z_slope = float(np.polyfit(t_rel, zs, 1)[0])
+                except np.linalg.LinAlgError:
+                    z_slope = 0.0
             fit_dz = z_slope * dt
             z_steps = np.diff(zs)
             push_trend = float(np.mean(z_steps < 0))
