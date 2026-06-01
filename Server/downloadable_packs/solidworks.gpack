@@ -1,0 +1,37 @@
+{
+  "id": "solidworks",
+  "name": "SolidWorks",
+  "icon": "⚙️",
+  "description": "Gesture mappings for SolidWorks 3D CAD — viewport navigation, sketch tools, and view controls.",
+  "version": "1.0.0",
+  "gestures": {
+    "swipe_left": {
+      "label": "Undo",
+      "macro": "ctrl+z"
+    },
+    "swipe_right": {
+      "label": "Redo",
+      "macro": "ctrl+y"
+    },
+    "swipe_up": {
+      "label": "Fit All (Zoom to Fit)",
+      "macro": "f"
+    },
+    "swipe_down": {
+      "label": "View Selector / Normal To",
+      "macro": "ctrl+8"
+    },
+    "push": {
+      "label": "Rotate View (Middle Mouse Sim)",
+      "macro": "ctrl+r"
+    },
+    "pull": {
+      "label": "Zoom In",
+      "macro": "z"
+    },
+    "hold_center": {
+      "label": "Exit Pack / Default Mode",
+      "macro": "__EXIT_PACK__"
+    }
+  }
+}

@@ -1,0 +1,3 @@
+([('main',
+   '/Users/ramalchunduri/Downloads/ECE140B/GesturePuck/App/dist/main',
+   'EXECUTABLE')],)

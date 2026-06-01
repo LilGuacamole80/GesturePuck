@@ -155,5 +155,21 @@ def callback(code: str, state: str, request: Request, conn=Depends(get_db)):
     response.set_cookie(key="session_token", value=session_token, httponly=True)
     return response
 
+def get_current_user(request: Request):
+    token = request.cookies.get("session_token")
+    if not token:
+        return None
+    sub = sessions.get(token)
+    if not sub:
+        return None
+    return users.get(sub)
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(request, "settings.html", {"user": user})
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5500)

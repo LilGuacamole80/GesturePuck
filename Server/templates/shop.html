@@ -297,6 +297,7 @@
         creator: 'Me',
         price: '$0',
         tags: ['Git', 'Workflow'],
+        file: '../downloadable_packs/git.gpack',
       }, 
       {
         icon: '🎸',
@@ -305,38 +306,43 @@
         creator: 'Rama',
         price: '$0',
         tags: ['Music', 'Productivity'],
+        file: '../downloadable_packs/garageband.gpack',
       },  
       {
         icon: '🔷',
-        title: 'VS Code Essentials',
-        desc: 'This pack of gestures helps you navigate codebases with gestures.',
-        creator: 'DevMaster',
+        title: 'SolidWorks',
+        desc: 'This pack of gestures helps you navigate CAD designs with gestures.',
+        creator: 'GestureGod',
         price: '$0',
-        tags: ['Coding', 'VS Code'],
+        tags: ['Design', 'Engineering'],
+        file: '../downloadable_packs/solidworks.gpack',
       },
       {
         icon: '🖱️',
-        title: 'Terminal Navigator',
-        desc: 'Boost your terminal productivity with powerful gesture controls.',
+        title: 'Place holder 1',
+        desc: 'Boost your productivity with gestures.',
         creator: 'CommandPro',
         price: '$0',
-        tags: ['Terminal', 'Productivity'],
+        tags: ['Tag 1', 'Tag 2'],
+        file: '',
       },
       {
         icon: '🔍',
-        title: 'Quick Search',
+        title: 'Placeholder 2',
         desc: 'Find files, symbols and code instantly with gesture shortcuts.',
         creator: 'SearchMaster',
         price: '$0',
-        tags: ['Search', 'Productivity'],
+        tags: ['Tag 1', 'Tag 2'],
+        file: '',
       },
       {
         icon: '⚡',
-        title: 'Multi Cursor Pro',
+        title: 'Placeholder Pro',
         desc: 'Control multiple cursors like a pro with easy gestures.',
         creator: 'CursorX',
         price: '$0',
-        tags: ['Editing', 'Productivity'],
+        tags: ['Tag 1', 'Tag 2'],
+        file: '',
       },
     ];
 
@@ -365,7 +371,7 @@
           <div class="meta-row"><span class="label">Creator:</span><span class="creator">${p.creator}</span></div>
           <div class="meta-row"><span class="label">Price:</span><span class="price">${p.price}</span></div>
           <div class="tags">${p.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
-          <button class="btn-download" onclick="handleDownload(this, '${p.title}')">
+          <button class="btn-download" onclick="handleDownload(this, '${p.file}')">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
               <polyline points="7 10 12 15 17 10"/>
@@ -378,16 +384,21 @@
       grid.appendChild(card);
     });
 
-    function handleDownload(btn, title) {
-      btn.querySelector('span').textContent = 'Downloaded!';
-      btn.style.borderColor = 'var(--green)';
-      btn.style.color = 'var(--green)';
-      setTimeout(() => {
-        btn.querySelector('span').textContent = 'Download';
-        btn.style.borderColor = '';
-        btn.style.color = '';
-      }, 2000);
-    }
+    function handleDownload(btn, file) {
+  const a = document.createElement('a');
+  a.href = file;
+  a.download = file;
+  a.click();
+
+  btn.querySelector('span').textContent = 'Downloaded!';
+  btn.style.borderColor = 'var(--green)';
+  btn.style.color = 'var(--green)';
+  setTimeout(() => {
+    btn.querySelector('span').textContent = 'Download';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+  }, 2000);
+}
   </script>
 </body>
 </html>

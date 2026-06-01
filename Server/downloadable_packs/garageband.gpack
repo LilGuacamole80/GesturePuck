@@ -1,0 +1,22 @@
+{
+  "gpack_version": 1,
+  "id": "garageband",
+  "name": "GarageBand",
+  "icon": "🎸",
+  "description": "Music production controls for GarageBand",
+  "author": "GesturePuck",
+  "modes": [
+    {
+      "id": "transport",
+      "name": "Transport",
+      "icon": "▶",
+      "gestures": {
+        "swipe_left":  { "label": "Rewind",      "macro": "cmd+left" },
+        "swipe_right": { "label": "Fast Forward", "macro": "cmd+right" },
+        "push":        { "label": "Record",       "macro": "r" },
+        "pull":        { "label": "Play / Stop",  "macro": "space" },
+        "hold_center": { "label": "Exit Pack",    "macro": "" }
+      }
+    }
+  ]
+}
