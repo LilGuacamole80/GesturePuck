@@ -36,8 +36,8 @@ from pathlib import Path
 from typing import Any
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-APP_DIR   = Path(__file__).resolve().parents[1]
-PACKS_DIR = APP_DIR / "packs"
+TMP_DIR   = Path("/tmp")
+PACKS_DIR = TMP_DIR / "packs"
 
 
 def _ensure_dir():
