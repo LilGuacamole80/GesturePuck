@@ -28,6 +28,7 @@ build-backend = "hatchling.build"
 only-include = [
     "main.py",
     "lidar_gesture_studio.py",
+    "calibrate_sensors.py",
     "ui",
     "engine",
     "mappings.json",

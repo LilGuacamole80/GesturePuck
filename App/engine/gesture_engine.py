@@ -113,6 +113,14 @@ class GestureEngine:
             self._dual = False
 
         self.pipeline = FusedSignalPipeline(self.args) if self.args.dual else SignalPipeline(self.args)
+        if self.args.dual:
+            self._log(
+                "engine_pipeline",
+                "fusion_mode="
+                f"{getattr(self.pipeline, 'fusion_mode', 'n/a')} "
+                f"calibrated_sensors={getattr(self.pipeline, 'calibrated_sensors', ())} "
+                f"calibration_path={getattr(self.pipeline, 'sensor_calibration_path', None)}",
+            )
         self.detector = StrokeGestureDetector(self.args)
         self._thread = threading.Thread(target=self._loop, daemon=True)
 

@@ -16,11 +16,23 @@ from engine.active_app import get_mapped_app
 from engine.gesture_engine import GestureEngine
 from lidar_gesture_studio import (
     DualFramePacket,
+    DualSensorSerialFrameSource,
     FusedSignalPipeline,
+    SerialDebugLogger,
     StrokeGestureDetector,
     build_arg_parser,
     configure_runtime_args,
+    default_sensor_calibration_path,
+    load_sensor_calibration,
     parse_frame_line,
+    resolve_serial_debug_path,
+)
+from calibrate_sensors import (
+    TARGETS as SENSOR_CALIBRATION_TARGETS,
+    fit_sensor_affines,
+    read_visible_sensor_samples,
+    save_calibration,
+    summarize_sensor_samples,
 )
 from engine.packs import ModeManager
 from ui.pack_panel import render_pack_page, render_pack_sidebar_section
@@ -591,6 +603,354 @@ class BleScanDialog(tk.Toplevel):
         self.destroy()
 
 
+class SensorCalibrationDialog(tk.Toplevel):
+    """Collect five known finger positions and save the sensor fusion calibration."""
+
+    def __init__(
+        self,
+        parent,
+        *,
+        port: str,
+        baud: int,
+        serial_debug: bool,
+        serial_debug_log: str | None,
+        serial_debug_bytes: bool,
+        logger=None,
+        on_done=None,
+        on_cancel=None,
+    ):
+        super().__init__(parent)
+        self.parent = parent
+        self.port = port
+        self.baud = baud
+        self.serial_debug = serial_debug
+        self.serial_debug_log = serial_debug_log
+        self.serial_debug_bytes = serial_debug_bytes
+        self.logger = logger
+        self.on_done = on_done
+        self.on_cancel = on_cancel
+        self.output_path = default_sensor_calibration_path()
+        self.targets = list(SENSOR_CALIBRATION_TARGETS)
+        self.index = 0
+        self.captures = {}
+        self.source = None
+        self.pipeline = None
+        self.busy = True
+        self.completed = False
+        self.closed = False
+
+        self.title("Sensor Calibration")
+        self.configure(bg=BG)
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+        self.protocol("WM_DELETE_WINDOW", self._cancel)
+        self.bind("<Return>", lambda _event: self._sample_current())
+
+        frame = tk.Frame(self, bg=BG)
+        frame.pack(fill="both", expand=True, padx=20, pady=18)
+
+        tk.Label(
+            frame,
+            text="SENSOR CALIBRATION",
+            bg=BG,
+            fg=ACCENT,
+            font=FONT_TITLE,
+        ).pack(anchor="w")
+        tk.Label(
+            frame,
+            text=f"Direct USB: {port}",
+            bg=BG,
+            fg=TEXT_DIM,
+            font=FONT_LABEL,
+        ).pack(anchor="w", pady=(2, 8))
+
+        mk_separator(frame, BORDER).pack(fill="x", pady=(0, 12))
+
+        self.target_var = tk.StringVar(value="Opening puck stream…")
+        self.instruction_var = tk.StringVar(
+            value="Keep the puck connected. The app will pause macros while calibration runs."
+        )
+        self.result_var = tk.StringVar(value="")
+
+        tk.Label(
+            frame,
+            textvariable=self.target_var,
+            bg=BG,
+            fg=TEXT,
+            font=("Courier New", 15, "bold"),
+            anchor="w",
+            width=46,
+        ).pack(anchor="w")
+        tk.Label(
+            frame,
+            textvariable=self.instruction_var,
+            bg=BG,
+            fg=TEXT_MED,
+            font=FONT_LABEL,
+            anchor="w",
+            justify="left",
+            wraplength=520,
+        ).pack(anchor="w", pady=(8, 10))
+
+        self.progress_var = tk.StringVar(value="")
+        tk.Label(
+            frame,
+            textvariable=self.progress_var,
+            bg=BG,
+            fg=TEXT_DIM,
+            font=FONT_LABEL,
+            anchor="w",
+        ).pack(anchor="w", pady=(0, 8))
+
+        tk.Label(
+            frame,
+            textvariable=self.result_var,
+            bg=SURFACE,
+            fg=TEXT_MED,
+            font=FONT_MONO,
+            anchor="nw",
+            justify="left",
+            width=62,
+            height=8,
+            padx=10,
+            pady=8,
+        ).pack(fill="x")
+
+        btn_row = tk.Frame(frame, bg=BG)
+        btn_row.pack(fill="x", pady=(14, 0))
+        self.sample_btn = mk_btn(
+            btn_row,
+            "SAMPLE (ENTER)",
+            self._sample_current,
+            bg=ACCENT,
+            fg=BG,
+            width=16,
+        )
+        self.sample_btn.pack(side="left", padx=(0, 8))
+        mk_btn(btn_row, "CANCEL", self._cancel, bg=SURFACE2, fg=REC_CLR, width=10).pack(side="left")
+
+        self.geometry(f"+{parent.winfo_rootx()+120}+{parent.winfo_rooty()+110}")
+        self._set_sample_enabled(False)
+        threading.Thread(target=self._open_source, daemon=True).start()
+
+    def _log(self, event, message=""):
+        if self.logger is not None:
+            self.logger.log(event, message)
+
+    def _log_exception(self, event, exc):
+        if self.logger is not None:
+            self.logger.exception(event, exc)
+
+    def _set_sample_enabled(self, enabled: bool):
+        state = "normal" if enabled else "disabled"
+        self.sample_btn.config(state=state)
+
+    def _runtime_args(self):
+        args = build_arg_parser().parse_args([])
+        args.demo = False
+        args.dual = True
+        args.port = self.port
+        args.baud = self.baud
+        args.serial_debug = self.serial_debug
+        args.serial_debug_log = self.serial_debug_log
+        args.serial_debug_bytes = self.serial_debug_bytes
+        args.sensor_calibration = "off"
+        args.fusion_mode = "best-track"
+        args.min_quality = 0.18
+        args.min_component_cells = 2
+        configure_runtime_args(args)
+        return args
+
+    def _open_source(self):
+        try:
+            self._log("sensor_calibration_open", f"port={self.port!r} baud={self.baud}")
+            serial_debug_path = resolve_serial_debug_path(self.serial_debug_log)
+            serial_debug = SerialDebugLogger(
+                enabled=self.serial_debug,
+                path=serial_debug_path,
+                log_reads=self.serial_debug_bytes,
+            )
+            source = DualSensorSerialFrameSource(self.port, self.baud, serial_debug=serial_debug)
+            pipeline = FusedSignalPipeline(self._runtime_args())
+            self.source = source
+            self.pipeline = pipeline
+            source.start()
+            if self.closed:
+                self._cleanup_source()
+                return
+            try:
+                self.after(0, self._ready_for_target)
+            except tk.TclError:
+                self._cleanup_source()
+        except Exception as exc:
+            self._log_exception("sensor_calibration_open_error", exc)
+            message = f"Could not open {self.port}: {exc}"
+            if not self.closed:
+                try:
+                    self.after(0, lambda msg=message: self._fail(msg))
+                except tk.TclError:
+                    pass
+
+    def _ready_for_target(self):
+        if self.closed:
+            return
+        self.busy = False
+        self._set_sample_enabled(True)
+        self._show_target()
+
+    def _show_target(self):
+        if self.index >= len(self.targets):
+            self._finish()
+            return
+        name, description, _common = self.targets[self.index]
+        self.target_var.set(f"{self.index + 1}/5 · {name.upper()}")
+        self.instruction_var.set(
+            f"Move one finger/card {description}. Press Enter or SAMPLE immediately while holding it still."
+        )
+        self.progress_var.set(f"Saving to {self.output_path}")
+
+    def _sample_current(self):
+        if self.busy or self.closed or self.source is None or self.pipeline is None:
+            return
+        if self.index >= len(self.targets):
+            return
+        name, _description, _common = self.targets[self.index]
+        self.busy = True
+        self._set_sample_enabled(False)
+        self.target_var.set(f"Sampling {name.upper()}…")
+        self.instruction_var.set("Hold position until this point finishes.")
+        self.progress_var.set("")
+        threading.Thread(target=self._sample_worker, daemon=True).start()
+
+    def _sample_worker(self):
+        name, _description, _common = self.targets[self.index]
+        try:
+            source = self.source
+            pipeline = self.pipeline
+            if source is None or pipeline is None or self.closed:
+                return
+            while source.read_latest() is not None:
+                pass
+            pipeline.start_calibration()
+            samples, frames_seen = read_visible_sensor_samples(
+                source,
+                pipeline,
+                sample_seconds=1.25,
+                warmup_seconds=0.12,
+                min_quality=0.18,
+            )
+            summary = summarize_sensor_samples(samples, min_samples=3)
+            if not self.closed:
+                self.after(0, lambda: self._sample_done(name, summary, frames_seen))
+        except Exception as exc:
+            self._log_exception("sensor_calibration_sample_error", exc)
+            message = str(exc)
+            if not self.closed:
+                try:
+                    self.after(0, lambda target=name, msg=message: self._sample_failed(target, msg))
+                except tk.TclError:
+                    pass
+
+    def _sample_done(self, name, summary, frames_seen):
+        if self.closed:
+            return
+        if not summary:
+            self.busy = False
+            self._set_sample_enabled(True)
+            self.target_var.set(f"Retry {name.upper()}")
+            self.instruction_var.set(
+                "No stable hand blob was captured. Move into position and press Enter immediately while holding still."
+            )
+            self.progress_var.set(f"Frames read: {frames_seen}")
+            return
+
+        self.captures[name] = summary
+        lines = [self.result_var.get().strip()] if self.result_var.get().strip() else []
+        sensor_bits = []
+        for sensor_id in sorted(summary):
+            item = summary[sensor_id]
+            sensor_bits.append(
+                f"ToF#{sensor_id} x={item['x']:.2f} y={item['y']:.2f} q={item['quality']:.2f} n={int(item['n'])}"
+            )
+        lines.append(f"{name}: " + "; ".join(sensor_bits))
+        self.result_var.set("\n".join(lines[-6:]))
+        self.index += 1
+        self.busy = False
+        self._set_sample_enabled(True)
+        self._show_target()
+
+    def _sample_failed(self, name, message):
+        if self.closed:
+            return
+        self.busy = False
+        self._set_sample_enabled(True)
+        self.target_var.set(f"Retry {name.upper()}")
+        self.instruction_var.set(str(message))
+
+    def _finish(self):
+        self.busy = True
+        self._set_sample_enabled(False)
+        self.target_var.set("Fitting calibration…")
+        self.instruction_var.set("Writing sensor_calibration.json and restarting detection.")
+
+        try:
+            sensors = fit_sensor_affines(self.captures)
+            if not sensors:
+                raise RuntimeError("No sensor had at least three usable calibration points.")
+            save_calibration(self.output_path, self.captures, sensors)
+        except Exception as exc:
+            self._log_exception("sensor_calibration_fit_error", exc)
+            self._fail(str(exc))
+            return
+
+        self.completed = True
+        self._cleanup_source()
+        self.result_var.set(
+            "\n".join(
+                f"ToF#{sensor_id}: rms={info['rms_error_cells']} cells weight={info['sensor_weight']}"
+                for sensor_id, info in sorted(sensors.items(), key=lambda item: int(item[0]))
+            )
+        )
+        self.target_var.set("Calibration saved")
+        self.instruction_var.set("Detection will now restart with calibrated weighted fusion for macros.")
+        self.progress_var.set(str(self.output_path))
+        self.after(900, lambda: self._done(sensors))
+
+    def _done(self, sensors):
+        if self.on_done is not None:
+            self.on_done(sensors, self.output_path)
+        self.closed = True
+        self.destroy()
+
+    def _fail(self, message):
+        if self.closed:
+            return
+        self.completed = False
+        self._cleanup_source()
+        messagebox.showerror("Sensor calibration failed", message, parent=self)
+        self._cancel()
+
+    def _cleanup_source(self):
+        source = self.source
+        self.source = None
+        self.pipeline = None
+        if source is not None:
+            try:
+                source.close()
+            except Exception as exc:
+                self._log_exception("sensor_calibration_close_error", exc)
+
+    def _cancel(self):
+        if self.closed:
+            return
+        self.closed = True
+        self._cleanup_source()
+        if not self.completed and self.on_cancel is not None:
+            self.on_cancel()
+        self.destroy()
+
+
 # ── MAIN APP ───────────────────────────────────────────────────────────────────
 class GesturePuckApp:
     def __init__(
@@ -660,6 +1020,7 @@ class GesturePuckApp:
         self._local_record_token = None
         self._local_chord: list[str] = []
         self._local_held: set[str] = set()
+        self._sensor_calibration_dialog = None
 
         # GlobalKeyRecorder starts its permanent listener here, at app boot,
         # on the main thread — safe on macOS.
@@ -673,6 +1034,7 @@ class GesturePuckApp:
 
         self._build_ui()
         self._on_connection_type_changed()
+        self._refresh_calibration_hint()
         self.root.bind_all("<KeyPress>", self._on_local_key_press, add="+")
         self.root.bind_all("<KeyRelease>", self._on_local_key_release, add="+")
         self._show_page("Global")
@@ -765,7 +1127,8 @@ class GesturePuckApp:
         mk_btn(controls, "CONNECT", self._connect, bg=ACCENT, fg=BG, width=10).pack(side="left", padx=(0, 4))
         mk_btn(controls, "DISCONNECT", self._disconnect_manual, bg=SURFACE2, fg=REC_CLR, width=12).pack(side="left", padx=(0, 4))
         mk_btn(controls, "DEMO", self._connect_demo, bg=SURFACE2, fg=TEXT_MED, width=7).pack(side="left", padx=(0, 4))
-        mk_btn(controls, "RECALIBRATE", self._recalibrate, bg=SURFACE2, fg=ACCENT, width=13).pack(side="left")
+        mk_btn(controls, "RECALIBRATE", self._recalibrate, bg=SURFACE2, fg=ACCENT, width=13).pack(side="left", padx=(0, 4))
+        mk_btn(controls, "SENSOR CAL", self._calibrate_sensors, bg=SURFACE2, fg=SAVE_CLR, width=12).pack(side="left")
 
         info_row = tk.Frame(devbar, bg=BG)
         info_row.pack(fill="x", pady=(5, 0))
@@ -988,6 +1351,7 @@ class GesturePuckApp:
             self._conn_mode_lbl.config(fg=ACCENT2)
             if hasattr(self, "_setup_hint_var"):
                 self._setup_hint_var.set("Bluetooth mode shows friendly names only; the BLE address stays hidden internally.")
+        self._refresh_calibration_hint()
 
     def _on_device_selected(self, event=None):
         shown = self.device_var.get().strip()
@@ -1161,6 +1525,104 @@ class GesturePuckApp:
 
         self._set_status("Not Connected", TEXT_DIM)
         messagebox.showinfo("Recalibrate", "Connect to the puck before recalibrating.")
+
+    def _calibration_hint_text(self) -> str:
+        try:
+            path, transforms, _weights = load_sensor_calibration("auto")
+        except Exception as exc:
+            self.logger.exception("sensor_calibration_hint_error", exc)
+            return "Sensor calibration: file unreadable."
+        if transforms:
+            sensors = ", ".join(f"ToF#{sensor_id}" for sensor_id in sorted(transforms))
+            return f"Sensor calibration: active for {sensors}."
+        path = path or default_sensor_calibration_path()
+        return f"Sensor calibration: not fitted yet ({path.name})."
+
+    def _refresh_calibration_hint(self):
+        if not hasattr(self, "_setup_hint_var"):
+            return
+        mode = self.connection_type_var.get()
+        if mode == "Bluetooth":
+            base = "Bluetooth mode shows friendly names only; the BLE address stays hidden internally."
+        else:
+            base = "Direct mode uses your USB serial port, for example COM5 or /dev/cu.usbserial-xxxx."
+        self._setup_hint_var.set(f"{base}  {self._calibration_hint_text()}")
+
+    def _calibrate_sensors(self):
+        """Run the five-point ToF sensor alignment inside the Tkinter app."""
+        dialog = self._sensor_calibration_dialog
+        try:
+            if dialog is not None and dialog.winfo_exists():
+                dialog.lift()
+                dialog.focus_force()
+                return
+        except Exception:
+            self._sensor_calibration_dialog = None
+
+        with self._ble_state_lock:
+            ble_ready = self.connection is not None and self._ble_connected
+        mode = self.connection_type_var.get()
+        if mode == "Bluetooth" or ble_ready:
+            messagebox.showinfo(
+                "Sensor calibration",
+                "Sensor calibration currently uses Direct USB so the app can reopen the serial stream cleanly. "
+                "Switch to Direct, select the USB serial port, then run SENSOR CAL.",
+            )
+            return
+
+        active_engine = self.engine
+        active_args = getattr(active_engine, "args", None)
+        if bool(getattr(active_args, "demo", False)):
+            messagebox.showinfo("Sensor calibration", "Calibration needs the physical puck, not demo mode.")
+            return
+
+        port = str(getattr(active_args, "port", None) or self._resolve_selected_device_value()).strip()
+        if port.upper().startswith("BLE:"):
+            port = ""
+        if not port:
+            messagebox.showerror("Sensor calibration", "Select the Direct USB serial port first.")
+            return
+
+        restart_after_cancel = active_engine is not None
+        self.logger.log(
+            "sensor_calibration_start",
+            f"port={port!r} baud={self.baud} restart_after_cancel={restart_after_cancel}",
+        )
+        self._connect_generation += 1
+        self._stop_existing_engine()
+        self._set_status("Calibrating", ACCENT)
+
+        self._sensor_calibration_dialog = SensorCalibrationDialog(
+            self.root,
+            port=port,
+            baud=self.baud,
+            serial_debug=self.serial_debug,
+            serial_debug_log=self.serial_debug_log,
+            serial_debug_bytes=self.serial_debug_bytes,
+            logger=self.logger,
+            on_done=lambda sensors, path, p=port: self._on_sensor_calibration_done(p, sensors, path),
+            on_cancel=lambda p=port, restart=restart_after_cancel: self._on_sensor_calibration_cancelled(p, restart),
+        )
+
+    def _on_sensor_calibration_done(self, port, sensors, path):
+        self._sensor_calibration_dialog = None
+        sensor_summary = ", ".join(
+            f"ToF#{sensor_id}:rms={info.get('rms_error_cells')}"
+            for sensor_id, info in sorted(sensors.items(), key=lambda item: int(item[0]))
+        )
+        self.logger.log("sensor_calibration_done", f"path={path} {sensor_summary}")
+        self._refresh_calibration_hint()
+        self._set_status("Calibrated", ACCENT)
+        self._start_engine(port=port, demo=False)
+
+    def _on_sensor_calibration_cancelled(self, port, restart):
+        self._sensor_calibration_dialog = None
+        self.logger.log("sensor_calibration_cancelled", f"port={port!r} restart={restart}")
+        self._refresh_calibration_hint()
+        if restart and port:
+            self._start_engine(port=port, demo=False)
+        else:
+            self._set_status("Not Connected", TEXT_DIM)
 
     # ── BLE ENGINE ────────────────────────────────────────────────────────────
     def _make_ble_classifier(self):
