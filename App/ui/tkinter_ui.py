@@ -606,6 +606,8 @@ class BleScanDialog(tk.Toplevel):
 class SensorCalibrationDialog(tk.Toplevel):
     """Collect five known finger positions and save the sensor fusion calibration."""
 
+    OPEN_TIMEOUT_S = 8.0
+
     def __init__(
         self,
         parent,
@@ -638,6 +640,9 @@ class SensorCalibrationDialog(tk.Toplevel):
         self.busy = True
         self.completed = False
         self.closed = False
+        self._events: queue.Queue = queue.Queue()
+        self._open_started_at = time.time()
+        self._open_finished = False
 
         self.title("Sensor Calibration")
         self.configure(bg=BG)
@@ -732,7 +737,9 @@ class SensorCalibrationDialog(tk.Toplevel):
 
         self.geometry(f"+{parent.winfo_rootx()+120}+{parent.winfo_rooty()+110}")
         self._set_sample_enabled(False)
+        self.progress_var.set("Opening serial reader…")
         threading.Thread(target=self._open_source, daemon=True).start()
+        self.after(50, self._poll_events)
 
     def _log(self, event, message=""):
         if self.logger is not None:
@@ -745,6 +752,43 @@ class SensorCalibrationDialog(tk.Toplevel):
     def _set_sample_enabled(self, enabled: bool):
         state = "normal" if enabled else "disabled"
         self.sample_btn.config(state=state)
+
+    def _post_event(self, kind: str, *payload):
+        if not self.closed:
+            self._events.put((kind, *payload))
+
+    def _poll_events(self):
+        if self.closed:
+            return
+        try:
+            while True:
+                event = self._events.get_nowait()
+                kind = event[0]
+                if kind == "ready":
+                    self._ready_for_target()
+                elif kind == "fail":
+                    self._fail(str(event[1]))
+                elif kind == "sample_done":
+                    _kind, name, summary, frames_seen = event
+                    self._sample_done(name, summary, frames_seen)
+                elif kind == "sample_failed":
+                    _kind, name, message = event
+                    self._sample_failed(name, message)
+        except queue.Empty:
+            pass
+
+        if (
+            not self.closed
+            and not self._open_finished
+            and time.time() - self._open_started_at > self.OPEN_TIMEOUT_S
+        ):
+            self._fail(
+                f"Timed out opening {self.port}. The port may still be held by another process "
+                "or the previous detector connection may not have released it yet. Close Serial Monitor "
+                "and try SENSOR CAL again."
+            )
+            return
+        self.after(50, self._poll_events)
 
     def _runtime_args(self):
         args = build_arg_parser().parse_args([])
@@ -776,21 +820,16 @@ class SensorCalibrationDialog(tk.Toplevel):
             self.source = source
             self.pipeline = pipeline
             source.start()
+            self._open_finished = True
             if self.closed:
                 self._cleanup_source()
                 return
-            try:
-                self.after(0, self._ready_for_target)
-            except tk.TclError:
-                self._cleanup_source()
+            self._post_event("ready")
         except Exception as exc:
+            self._open_finished = True
             self._log_exception("sensor_calibration_open_error", exc)
             message = f"Could not open {self.port}: {exc}"
-            if not self.closed:
-                try:
-                    self.after(0, lambda msg=message: self._fail(msg))
-                except tk.TclError:
-                    pass
+            self._post_event("fail", message)
 
     def _ready_for_target(self):
         if self.closed:
@@ -841,16 +880,11 @@ class SensorCalibrationDialog(tk.Toplevel):
                 min_quality=0.18,
             )
             summary = summarize_sensor_samples(samples, min_samples=3)
-            if not self.closed:
-                self.after(0, lambda: self._sample_done(name, summary, frames_seen))
+            self._post_event("sample_done", name, summary, frames_seen)
         except Exception as exc:
             self._log_exception("sensor_calibration_sample_error", exc)
             message = str(exc)
-            if not self.closed:
-                try:
-                    self.after(0, lambda target=name, msg=message: self._sample_failed(target, msg))
-                except tk.TclError:
-                    pass
+            self._post_event("sample_failed", name, message)
 
     def _sample_done(self, name, summary, frames_seen):
         if self.closed:
@@ -1021,6 +1055,7 @@ class GesturePuckApp:
         self._local_chord: list[str] = []
         self._local_held: set[str] = set()
         self._sensor_calibration_dialog = None
+        self._sensor_calibration_pending = False
 
         # GlobalKeyRecorder starts its permanent listener here, at app boot,
         # on the main thread — safe on macOS.
@@ -1559,6 +1594,9 @@ class GesturePuckApp:
 
     def _calibrate_sensors(self):
         """Run the five-point ToF sensor alignment inside the Tkinter app."""
+        if self._sensor_calibration_pending:
+            self._set_status("Calibrating", ACCENT)
+            return
         dialog = self._sensor_calibration_dialog
         try:
             if dialog is not None and dialog.winfo_exists():
@@ -1600,7 +1638,18 @@ class GesturePuckApp:
         self._connect_generation += 1
         self._stop_existing_engine()
         self._set_status("Calibrating", ACCENT)
+        self._sensor_calibration_pending = True
 
+        delay_ms = 750 if restart_after_cancel else 100
+        self.root.after(
+            delay_ms,
+            lambda p=port, restart=restart_after_cancel: self._open_sensor_calibration_dialog(p, restart),
+        )
+
+    def _open_sensor_calibration_dialog(self, port, restart_after_cancel):
+        self._sensor_calibration_pending = False
+        if self.root.winfo_exists() == 0:
+            return
         self._sensor_calibration_dialog = SensorCalibrationDialog(
             self.root,
             port=port,
@@ -1615,6 +1664,7 @@ class GesturePuckApp:
 
     def _on_sensor_calibration_done(self, port, sensors, path):
         self._sensor_calibration_dialog = None
+        self._sensor_calibration_pending = False
         sensor_summary = ", ".join(
             f"ToF#{sensor_id}:rms={info.get('rms_error_cells')}"
             for sensor_id, info in sorted(sensors.items(), key=lambda item: int(item[0]))
@@ -1626,6 +1676,7 @@ class GesturePuckApp:
 
     def _on_sensor_calibration_cancelled(self, port, restart):
         self._sensor_calibration_dialog = None
+        self._sensor_calibration_pending = False
         self.logger.log("sensor_calibration_cancelled", f"port={port!r} restart={restart}")
         self._refresh_calibration_hint()
         if restart and port:
@@ -1917,9 +1968,19 @@ class GesturePuckApp:
                     on_status=self._on_engine_status,
                     logger=self.logger,
                 )
+                if generation != self._connect_generation:
+                    self.logger.log("connect_thread", f"generation={generation} stale before start; closing engine")
+                    eng.stop()
+                    return
                 self.logger.log("connect_thread", f"generation={generation} starting engine")
                 self.engine = eng
                 eng.start()
+                if generation != self._connect_generation:
+                    self.logger.log("connect_thread", f"generation={generation} stale after start; closing engine")
+                    eng.stop()
+                    if self.engine is eng:
+                        self.engine = None
+                    return
                 self.logger.log("connect_thread", f"generation={generation} engine.start returned")
                 if demo:
                     self.root.after(0, lambda: self._set_status("DEMO", ACCENT))
