@@ -915,9 +915,9 @@ class DualSensorSerialFrameSource:
     FRAME CSV lines     → compact one-sensor bring-up stream
     debug text tables   → fallback parser for the serial-monitor bring-up sketch
 
-    A DualFramePacket is emitted from the latest available frames. The detector
-    fuses all finite ToF frames, so a missing or delayed sensor does not stall
-    classification.
+    A DualFramePacket is emitted from the latest available frames. Companion
+    frames older than companion_max_age_s are dropped from fusion so a delayed
+    or stalled sensor does not drag the fused track toward stale positions.
     """
 
     def __init__(
@@ -925,6 +925,7 @@ class DualSensorSerialFrameSource:
         port: str,
         baud: int = 115200,
         serial_debug: Optional[SerialDebugLogger] = None,
+        companion_max_age_s: float = 0.15,
     ):
         try:
             import serial  # type: ignore
@@ -947,6 +948,12 @@ class DualSensorSerialFrameSource:
         self._pending1: Optional[FramePacket] = None
         self._pending2: Optional[FramePacket] = None
         self._pending3: Optional[FramePacket] = None
+
+        # Arrival timestamps for each pending frame. _try_emit only fuses heads
+        # whose latest frame is newer than companion_max_age_s, which prevents
+        # mixing fresh and stale frames from different time instants.
+        self._pending_t: Dict[int, float] = {1: 0.0, 2: 0.0, 3: 0.0}
+        self.companion_max_age_s: float = max(0.0, float(companion_max_age_s))
 
         # Latest APDS state
         self._proximity: int = 0
@@ -1081,15 +1088,16 @@ class DualSensorSerialFrameSource:
         )
         if magic == BINARY_MAGIC:
             self._pending1 = pkt
+            self._pending_t[1] = time.time()
             self.tof1_frames += 1
             self._note("binary", f"MLD1 seq={seq} read_us={read_us} {frame_stats(values)}")
             self._try_emit(primary_sensor=1)
         else:
             self._pending2 = pkt
+            self._pending_t[2] = time.time()
             self.tof2_frames += 1
             self._note("binary", f"MLD2 seq={seq} read_us={read_us} {frame_stats(values)}")
-            if self._pending1 is None:
-                self._try_emit(primary_sensor=2)
+            self._try_emit(primary_sensor=2)
 
     def _handle_prox_line(self, line: str) -> None:
         # Format: #PROX,<proximity>,<0|1>
@@ -1219,6 +1227,7 @@ class DualSensorSerialFrameSource:
         else:
             self._pending3 = pkt
             self.tof3_frames += 1
+        self._pending_t[sensor] = time.time()
         self.text_frames += 1
         self._note("tof-frame", f"ToF #{sensor} csv frame parsed seq={pkt.seq} {frame_stats(pkt.values)}")
         self._try_emit(primary_sensor=sensor)
@@ -1266,54 +1275,60 @@ class DualSensorSerialFrameSource:
         else:
             self._pending2 = pkt
             self.tof2_frames += 1
+        self._pending_t[sensor] = time.time()
         self.text_frames += 1
         self._note(
             "tof-frame",
             f"ToF #{sensor} debug text frame parsed seq={pkt.seq} {frame_stats(values)}",
         )
         self._cancel_debug_frame()
-        if sensor == 1 or self._pending1 is None:
-            self._try_emit(primary_sensor=sensor)
+        self._try_emit(primary_sensor=sensor)
         if sensor == 2:
             self._debug_current_seq = None
 
     def _try_emit(self, primary_sensor: int = 1) -> None:
-        """Emit a DualFramePacket from the latest available ToF data."""
-        if self._pending1 is None and self._pending2 is None:
-            if self._pending3 is None:
-                return
+        """
+        Emit a DualFramePacket from the latest *fresh* ToF data.
 
-        if self._pending1 is not None:
-            primary = self._pending1
-            tof1 = self._pending1.values
-            tof2 = self._pending2.values if self._pending2 is not None else np.full_like(tof1, np.nan)
-            tof3 = self._pending3.values if self._pending3 is not None else np.full_like(tof1, np.nan)
-            primary_sensor = 1
-        elif self._pending2 is not None:
-            primary = self._pending2
-            tof1 = self._pending2.values
-            tof2 = self._pending2.values
-            tof3 = self._pending3.values if self._pending3 is not None else np.full_like(tof1, np.nan)
-            primary_sensor = 2
-        else:
-            primary = self._pending3
-            tof1 = self._pending3.values
-            tof2 = np.full_like(tof1, np.nan)
-            tof3 = self._pending3.values
-            primary_sensor = 3
+        tofN always carries sensor N's data (or NaN if that head is missing or
+        stale), and available_sensors lists only the heads whose latest frame is
+        newer than companion_max_age_s. This keeps the per-sensor identity stable
+        and stops the detector from fusing frames captured at different instants.
+        """
+        now = time.time()
+        pendings = {1: self._pending1, 2: self._pending2, 3: self._pending3}
+        fresh_ids = [
+            sid
+            for sid in (1, 2, 3)
+            if pendings[sid] is not None
+            and (now - self._pending_t.get(sid, 0.0)) <= self.companion_max_age_s
+        ]
+        if not fresh_ids:
+            return
 
-        available_sensors = tuple(
-            sensor_id
-            for sensor_id, pending in ((1, self._pending1), (2, self._pending2), (3, self._pending3))
-            if pending is not None
-        )
+        if primary_sensor not in fresh_ids:
+            primary_sensor = fresh_ids[0]
+        primary = pendings[primary_sensor]
 
+        def frame_for(sid: int) -> np.ndarray:
+            if sid in fresh_ids:
+                return pendings[sid].values
+            return np.full((GRID, GRID), np.nan)
+
+        tof1 = frame_for(1)
+        tof2 = frame_for(2)
+        tof3 = frame_for(3)
+
+        available_sensors = tuple(fresh_ids)
         if len(available_sensors) < 3:
             self.single_sensor_frames += 1
-
-        mode = "paired" if len(available_sensors) >= 2 else "single-sensor"
-        if len(available_sensors) == 3:
+        if len(available_sensors) >= 3:
             mode = "three-sensor"
+        elif len(available_sensors) == 2:
+            mode = "paired"
+        else:
+            mode = "single-sensor"
+
         dual = DualFramePacket(
             host_t=primary.host_t,
             tof1=tof1,
@@ -2249,26 +2264,9 @@ class StrokeGestureDetector:
         visible_sensor_mean = float(np.nanmean(visible_sensor_counts))
         sensor_support = clamp01(visible_sensor_mean / source_sensor_mean)
         sensor_support_factor = 0.90 + 0.10 * sensor_support
-        
+
         if n >= 3:
-            
-
-
             t_rel = ts - ts[0]
-
-
-            print("t_rel:", t_rel)
-            print("zs:", zs)
-
-            print("len(t_rel) =", len(t_rel))
-            print("len(zs) =", len(zs))
-
-            print("t_rel finite:", np.isfinite(t_rel).all())
-            print("zs finite:", np.isfinite(zs).all())
-
-            print("unique t_rel:", len(np.unique(t_rel)))
-
-
             t_span = t_rel[-1] - t_rel[0]
             if len(t_rel) < 2 or t_span == 0.0 or not np.isfinite(t_span):
                 z_slope = 0.0
@@ -3049,7 +3047,7 @@ class Visualizer:
             return
         if self._latest_hand_present:
             color = "#2ecc71"   # green
-            label = "✋ Hand Present"
+            label = "Hand Present"
         else:
             color = "#e74c3c"   # red
             label = "No Hand"
@@ -3207,6 +3205,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         ),
     )
     src.add_argument(
+        "--companion-max-age-ms",
+        type=float,
+        default=150.0,
+        help="Dual mode: max age in ms for a companion ToF frame to count as fresh during fusion. "
+             "Roughly 1.5x your per-head frame interval. Larger keeps stale heads in the fuse.",
+    )
+    src.add_argument(
         "--serial-debug",
         action="store_true",
         help="Print serial receive/parser debug messages to stderr.",
@@ -3244,7 +3249,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--calibration-frames",
         type=int,
         default=None,
-        help="Frames used for empty-scene background calibration; defaults to 60, or 0 with --dual/demo",
+        help="Frames used for empty-scene background calibration; defaults to 60, or 0 with --dual/demo. "
+             "For 3 outward-facing heads, background subtraction matters; try 60 with hands out of view.",
     )
     filt.add_argument("--invalid-zero", action=argparse.BooleanOptionalAction, default=True)
     filt.add_argument("--median-window", type=int, default=3, help="Temporal median frames; 1 disables")
@@ -3381,7 +3387,12 @@ def main() -> int:
         source = DemoFrameSource(max_mm=args.max_mm)
     elif args.dual:
         # Dual-sensor mode accepts both debug text at 115200 and binary MLD1/MLD2 streams.
-        source = DualSensorSerialFrameSource(args.port, args.baud, serial_debug=serial_debug)
+        source = DualSensorSerialFrameSource(
+            args.port,
+            args.baud,
+            serial_debug=serial_debug,
+            companion_max_age_s=max(0.0, args.companion_max_age_ms / 1000.0),
+        )
     else:
         source = SerialFrameSource(args.port, args.baud, serial_debug=serial_debug)
 
@@ -3399,6 +3410,7 @@ def main() -> int:
     elif args.dual:
         print("Multi-sensor mode: APDS-9930 proximity + confidence-weighted ToF #1/#2/#3 fusion.")
         print(f"Reading {args.port} at {args.baud} baud.")
+        print(f"Companion frame freshness window: {args.companion_max_age_ms:.0f} ms.")
         print("This accepts FRAME1/FRAME2/FRAME3 CSV streams plus legacy MLD1/MLD2/debug text.")
     else:
         print("Close PlatformIO Serial Monitor before using this script.")
@@ -3406,6 +3418,8 @@ def main() -> int:
         print("Keep your hand out of view during calibration, then perform gestures inside the 8x8 grid.")
     else:
         print("Background calibration is disabled; perform gestures inside the 8x8 grid.")
+        if args.dual:
+            print("Tip: outward-facing heads see walls as permanent foreground. Try --calibration-frames 60.")
     print("Press r in the window to recalibrate. Use --flip-x / --flip-y if directions are mirrored.")
     if diag_logger.enabled and diag_logger.path is not None:
         print(f"Diagnostic log: {diag_logger.path}")

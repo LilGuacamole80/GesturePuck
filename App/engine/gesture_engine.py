@@ -176,7 +176,7 @@ class GestureEngine:
                         except Exception as exc:
                             stats = f"stats unavailable: {exc}"
                         self._log("engine_wait", stats)
-                    time.sleep(0.01)
+                    #time.sleep(0.01)
                     continue
 
                 packet = raw

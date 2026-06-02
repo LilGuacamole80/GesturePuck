@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include "DFRobot_MatrixLidar.h"
-#include <APDS9930.h>
 #undef WAIT
 #include <FastLED.h>
 
@@ -74,18 +73,10 @@ const uint8_t TOF_ADDRS[NUM_TOF]    = {0x30, 0x32, 0x33};
 #define LED_PIN 18
 #define NUM_LEDS 12
 
-// APDS-9930 hand detection threshold. Raise/lower if your APDS module reads differently.
-#define HAND_THRESHOLD 200
-
 const uint32_t SERIAL_BAUD      = 115200;
 const uint32_t FRAME_PERIOD_MS  = 50;
 const uint32_t STATUS_PERIOD_MS = 1000;
 
-// Gesture capture window. ToF is the primary trigger; APDS remains a secondary
-// hint. ToF frames are buffered before trigger so fast gesture onsets are kept.
-const uint32_t POST_HAND_CAPTURE_MS = 650;
-const uint32_t MIN_CAPTURE_MS       = 180;
-const uint32_t MAX_CAPTURE_MS       = 1800;
 const uint8_t  LED_BRIGHTNESS   = 8;
 
 const uint16_t TOF_TRIGGER_MAX_MM       = 1650;
@@ -104,13 +95,11 @@ DFRobot_MatrixLidar_I2C tof2(TOF_ADDRS[1]);
 DFRobot_MatrixLidar_I2C tof3(TOF_ADDRS[2]);
 DFRobot_MatrixLidar_I2C *tofs[NUM_TOF] = {&tof1, &tof2, &tof3};
 
-APDS9930 apds;
 CRGB leds[NUM_LEDS];
 
 uint16_t frames[NUM_TOF][64];
 bool tofOK[NUM_TOF] = {false, false, false};
 bool currentTofOK[NUM_TOF] = {false, false, false};
-bool apdsOK = false;
 
 uint16_t pretriggerFrames[PRETRIGGER_FRAME_COUNT][NUM_TOF][64];
 bool pretriggerOK[PRETRIGGER_FRAME_COUNT][NUM_TOF];
@@ -122,13 +111,6 @@ uint8_t pretriggerCount = 0;
 uint32_t lastPrintMs  = 0;
 uint32_t lastStatusMs = 0;
 uint32_t frameSeq     = 0;
-
-bool captureActive = false;
-bool captureSawHand = false;
-uint32_t captureId = 0;
-uint32_t captureStartMs = 0;
-uint32_t lastHandMs = 0;
-uint32_t lastActivityMs = 0;
 
 uint16_t prevFrames[NUM_TOF][64];
 bool havePrevFrame[NUM_TOF] = {false, false, false};
@@ -278,12 +260,6 @@ static void printLine(const char *line) {
     bleSendLine(line);
 }
 
-void printProximity(uint16_t proximity, bool handPresent) {
-    char buf[32];
-    snprintf(buf, sizeof(buf), "#PROX,%u,%d", proximity, handPresent ? 1 : 0);
-    printLine(buf);
-}
-
 void printFrameCSV(const char *prefix, uint32_t seq, uint32_t deviceMs, uint16_t frame[64]) {
     char buf[512];
     int pos = snprintf(buf, sizeof(buf), "%s,%lu,%lu", prefix, (unsigned long)seq, (unsigned long)deviceMs);
@@ -391,54 +367,7 @@ bool detectToFActivity() {
 
     bool activeEnough = activeCells >= TOF_TRIGGER_MIN_CELLS;
     bool movingEnough = movingCells >= TOF_MOTION_MIN_CELLS;
-    return activeEnough && (!anyPreviousFrame || movingEnough || captureActive);
-}
-
-void printCaptureState(const char *state, uint32_t id, uint32_t nowMs, const char *reason) {
-    char buf[80];
-    snprintf(buf, sizeof(buf), "#CAPTURE,%s,%lu,%lu,%s", state, (unsigned long)id, (unsigned long)nowMs, reason);
-    printLine(buf);
-}
-
-bool updateCaptureWindow(bool handPresent, bool tofActivity, uint32_t nowMs) {
-    bool activity = handPresent || tofActivity;
-    if (activity) {
-        lastActivityMs = nowMs;
-        if (handPresent) {
-            lastHandMs = nowMs;
-        }
-        if (!captureActive) {
-            captureActive = true;
-            captureSawHand = handPresent;
-            captureStartMs = nowMs;
-            captureId++;
-            printCaptureState("START", captureId, nowMs, handPresent ? "apds_on" : "tof_motion");
-            return true;
-        } else {
-            captureSawHand = captureSawHand || handPresent;
-        }
-        return false;
-    }
-
-    if (!captureActive) return false;
-
-    uint32_t sinceStart = nowMs - captureStartMs;
-    uint32_t sinceActivity = nowMs - lastActivityMs;
-
-    // Keep streaming after ToF/APDS activity releases. This is important for fast
-    // swipes: the last ToF frames often carry the exit direction even after
-    // proximity/motion already fell below threshold.
-    bool minWindowDone = sinceStart >= MIN_CAPTURE_MS;
-    bool tailDone = sinceActivity >= POST_HAND_CAPTURE_MS;
-    bool tooLong = sinceStart >= MAX_CAPTURE_MS;
-
-    if ((minWindowDone && tailDone) || tooLong) {
-        const char *reason = tooLong ? "max_window" : "post_activity_tail_done";
-        printCaptureState("END", captureId, nowMs, reason);
-        captureActive = false;
-        captureSawHand = false;
-    }
-    return false;
+    return activeEnough && (!anyPreviousFrame || movingEnough);
 }
 
 void printStatusThrottled(const char *message) {
@@ -470,21 +399,6 @@ bool setupToF(uint8_t index) {
         return false;
     }
     Serial.print(name); Serial.println(" connected.");
-    return true;
-}
-
-bool setupAPDS9930() {
-    Serial.println("Starting APDS-9930...");
-    if (!apds.init()) {
-        Serial.println("APDS-9930 init FAILED.");
-        return false;
-    }
-    Serial.println("APDS-9930 init OK.");
-    if (!apds.enableProximitySensor(false)) {
-        Serial.println("APDS-9930 proximity enable FAILED.");
-        return false;
-    }
-    Serial.println("APDS-9930 proximity enabled.");
     return true;
 }
 
@@ -533,12 +447,11 @@ void setup() {
     Wire.setTimeOut(50);
     resetMux();
 
-    Serial.println("Starting APDS-9930 + 3x ToF through TCA9548A + LED ring + BLE...");
+    Serial.println("Starting 3x ToF through TCA9548A + LED ring + BLE...");
 
     scanMainI2C();
     scanMuxChannels();
 
-    apdsOK = setupAPDS9930();
     for (uint8_t i = 0; i < NUM_TOF; i++) {
         tofOK[i] = setupToF(i);
     }
@@ -547,7 +460,6 @@ void setup() {
     setupBLE();
 
     Serial.println("\nSetup complete.");
-    Serial.print("APDS: "); Serial.println(apdsOK ? "OK" : "FAILED");
     for (uint8_t i = 0; i < NUM_TOF; i++) {
         Serial.print("ToF #"); Serial.print(i + 1); Serial.print(": ");
         Serial.println(tofOK[i] ? "OK" : "FAILED");
@@ -560,42 +472,13 @@ void loop() {
     if (millis() - lastPrintMs < FRAME_PERIOD_MS) return;
     lastPrintMs = millis();
 
-    bool handPresent = false;
-    uint16_t proximity = 0;
-    bool sensorError = false;
-
-    if (apdsOK) {
-        if (apds.readProximity(proximity)) {
-            handPresent = proximity > HAND_THRESHOLD;
-        } else {
-            printStatusThrottled("#ERR,APDS,read_failed");
-            sensorError = true;
-        }
-    } else {
-        printStatusThrottled("#ERR,APDS,init_failed");
-        sensorError = true;
-    }
-
-    // ToF is read every frame so it can trigger capture and fill the pre-trigger
-    // history. Serial/BLE output is still emitted only during active capture.
+    // ToF is read every frame so the stream stays live even when there is no
+    // nearby hand or motion trigger.
     readAllToFSensors();
     bool tofActivity = detectToFActivity();
     appendPretriggerFrame(frameSeq, lastPrintMs);
-
-    if (sensorError) {
-        setRingColor(CRGB::Blue);
-    } else {
-        setRingColor((handPresent || tofActivity || captureActive) ? CRGB::Green : CRGB::Red);
-    }
-
-    printProximity(proximity, handPresent);
-    bool captureStarted = updateCaptureWindow(handPresent, tofActivity, lastPrintMs);
-
-    if (captureStarted) {
-        flushPretriggerFrames();
-    } else if (captureActive) {
-        printCurrentFrames(frameSeq, lastPrintMs);
-    }
+    setRingColor(tofActivity ? CRGB::Green : CRGB::Red);
+    printCurrentFrames(frameSeq, lastPrintMs);
 
     frameSeq++;
 }

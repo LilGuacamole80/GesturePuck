@@ -1,0 +1,41 @@
+{
+  "id": "git",
+  "name": "Git",
+  "icon": "🐙",
+  "description": "Gesture mappings for common Git operations.",
+  "version": "1.0.0",
+  "gestures": {
+    "swipe_left": {
+      "label": "Undo last commit (soft reset)",
+      "macro": "git reset --soft HEAD~1"
+    },
+    "swipe_right": {
+      "label": "Git status",
+      "macro": "git status"
+    },
+    "swipe_up": {
+      "label": "Stage, commit & push",
+      "macro": [
+        "git add .",
+        "git commit -m \"$(git diff --cached --name-only | head -5 | paste -sd ', ' -) — auto-commit\"",
+        "git push origin main"
+      ]
+    },
+    "swipe_down": {
+      "label": "Pull latest",
+      "macro": "git pull origin main"
+    },
+    "push": {
+      "label": "Create & switch new branch",
+      "macro": "git checkout -b feature/$(date +%Y%m%d)"
+    },
+    "pull": {
+      "label": "View log (oneline)",
+      "macro": "git log --oneline -10"
+    },
+    "hold_center": {
+      "label": "Exit pack / default mode",
+      "macro": "__EXIT_PACK__"
+    }
+  }
+}
