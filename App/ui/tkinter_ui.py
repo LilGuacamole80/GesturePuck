@@ -1127,8 +1127,6 @@ class GesturePuckApp:
         mk_btn(controls, "CONNECT", self._connect, bg=ACCENT, fg=BG, width=10).pack(side="left", padx=(0, 4))
         mk_btn(controls, "DISCONNECT", self._disconnect_manual, bg=SURFACE2, fg=REC_CLR, width=12).pack(side="left", padx=(0, 4))
         mk_btn(controls, "DEMO", self._connect_demo, bg=SURFACE2, fg=TEXT_MED, width=7).pack(side="left", padx=(0, 4))
-        mk_btn(controls, "RECALIBRATE", self._recalibrate, bg=SURFACE2, fg=ACCENT, width=13).pack(side="left", padx=(0, 4))
-        mk_btn(controls, "SENSOR CAL", self._calibrate_sensors, bg=SURFACE2, fg=SAVE_CLR, width=12).pack(side="left")
 
         info_row = tk.Frame(devbar, bg=BG)
         info_row.pack(fill="x", pady=(5, 0))
@@ -1149,6 +1147,17 @@ class GesturePuckApp:
             bg=BG, fg=TEXT_DIM, font=FONT_LABEL, anchor="w",
         )
         self._setup_hint_lbl.pack(side="left", padx=(14, 0), fill="x", expand=True)
+
+        setup_actions = tk.Frame(devbar, bg=BG)
+        setup_actions.pack(fill="x", pady=(6, 0))
+        mk_label(setup_actions, "SETUP", fg=TEXT_DIM).pack(side="left", padx=(0, 8))
+        mk_btn(setup_actions, "RECALIBRATE", self._recalibrate, bg=SURFACE2, fg=ACCENT, width=13).pack(side="left", padx=(0, 6))
+        mk_btn(setup_actions, "SENSOR CAL", self._calibrate_sensors, bg=SURFACE2, fg=SAVE_CLR, width=12).pack(side="left", padx=(0, 6))
+        mk_label(
+            setup_actions,
+            "Run SENSOR CAL after changing puck placement or sensor alignment.",
+            fg=TEXT_DIM,
+        ).pack(side="left", padx=(6, 0))
 
         mk_separator(self.root).pack(fill="x")
 
