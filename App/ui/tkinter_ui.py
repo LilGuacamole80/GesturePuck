@@ -23,7 +23,7 @@ from lidar_gesture_studio import (
     build_arg_parser,
     configure_runtime_args,
     default_sensor_calibration_path,
-    load_sensor_calibration,
+    load_sensor_calibration_data,
     parse_frame_line,
     resolve_serial_debug_path,
 )
@@ -604,7 +604,7 @@ class BleScanDialog(tk.Toplevel):
 
 
 class SensorCalibrationDialog(tk.Toplevel):
-    """Collect five known finger positions and save the sensor fusion calibration."""
+    """Collect known XY positions plus Z up/down depth and save sensor calibration."""
 
     OPEN_TIMEOUT_S = 8.0
 
@@ -644,7 +644,7 @@ class SensorCalibrationDialog(tk.Toplevel):
         self._open_started_at = time.time()
         self._open_finished = False
 
-        self.title("Sensor Calibration")
+        self.title("XYZ Sensor Calibration")
         self.configure(bg=BG)
         self.resizable(False, False)
         self.transient(parent)
@@ -657,7 +657,7 @@ class SensorCalibrationDialog(tk.Toplevel):
 
         tk.Label(
             frame,
-            text="SENSOR CALIBRATION",
+            text="XYZ SENSOR CALIBRATION",
             bg=BG,
             fg=ACCENT,
             font=FONT_TITLE,
@@ -843,7 +843,7 @@ class SensorCalibrationDialog(tk.Toplevel):
             self._finish()
             return
         name, description, _common = self.targets[self.index]
-        self.target_var.set(f"{self.index + 1}/5 · {name.upper()}")
+        self.target_var.set(f"{self.index + 1}/{len(self.targets)} · {name.upper()}")
         self.instruction_var.set(
             f"Move one finger/card {description}. Press Enter or SAMPLE immediately while holding it still."
         )
@@ -905,10 +905,10 @@ class SensorCalibrationDialog(tk.Toplevel):
         for sensor_id in sorted(summary):
             item = summary[sensor_id]
             sensor_bits.append(
-                f"ToF#{sensor_id} x={item['x']:.2f} y={item['y']:.2f} q={item['quality']:.2f} n={int(item['n'])}"
+                f"ToF#{sensor_id} x={item['x']:.2f} y={item['y']:.2f} z={item['z']:.0f}mm q={item['quality']:.2f} n={int(item['n'])}"
             )
         lines.append(f"{name}: " + "; ".join(sensor_bits))
-        self.result_var.set("\n".join(lines[-6:]))
+        self.result_var.set("\n".join(lines[-len(self.targets):]))
         self.index += 1
         self.busy = False
         self._set_sample_enabled(True)
@@ -942,14 +942,24 @@ class SensorCalibrationDialog(tk.Toplevel):
         self._cleanup_source()
         self.result_var.set(
             "\n".join(
-                f"ToF#{sensor_id}: rms={info['rms_error_cells']} cells weight={info['sensor_weight']}"
+                self._summary_line(sensor_id, info)
                 for sensor_id, info in sorted(sensors.items(), key=lambda item: int(item[0]))
             )
         )
         self.target_var.set("Calibration saved")
-        self.instruction_var.set("Detection will now restart with calibrated weighted fusion for macros.")
+        self.instruction_var.set("Detection will now restart with calibrated XY fusion and Z push/pull depth.")
         self.progress_var.set(str(self.output_path))
         self.after(900, lambda: self._done(sensors))
+
+    @staticmethod
+    def _summary_line(sensor_id, info):
+        z_info = info.get("z_calibration") if isinstance(info, dict) else None
+        z_text = ""
+        if isinstance(z_info, dict):
+            z_text = f" z_span={z_info.get('span_calibrated_mm')}mm"
+        rms = info.get("rms_error_cells")
+        rms_text = f"{rms} cells" if rms is not None else "xy skipped"
+        return f"ToF#{sensor_id}: rms={rms_text} weight={info['sensor_weight']}{z_text}"
 
     def _done(self, sensors):
         if self.on_done is not None:
@@ -1190,7 +1200,7 @@ class GesturePuckApp:
         mk_btn(setup_actions, "SENSOR CAL", self._calibrate_sensors, bg=SURFACE2, fg=SAVE_CLR, width=12).pack(side="left", padx=(0, 6))
         mk_label(
             setup_actions,
-            "Run SENSOR CAL after changing puck placement or sensor alignment.",
+            "Run SENSOR CAL after changing puck placement, sensor alignment, or push/pull height.",
             fg=TEXT_DIM,
         ).pack(side="left", padx=(6, 0))
 
@@ -1572,14 +1582,23 @@ class GesturePuckApp:
 
     def _calibration_hint_text(self) -> str:
         try:
-            path, transforms, _weights = load_sensor_calibration("auto")
+            calibration = load_sensor_calibration_data("auto")
         except Exception as exc:
             self.logger.exception("sensor_calibration_hint_error", exc)
             return "Sensor calibration: file unreadable."
-        if transforms:
-            sensors = ", ".join(f"ToF#{sensor_id}" for sensor_id in sorted(transforms))
-            return f"Sensor calibration: active for {sensors}."
-        path = path or default_sensor_calibration_path()
+        parts = []
+        if calibration.xy_transforms:
+            sensors = ", ".join(f"ToF#{sensor_id}" for sensor_id in sorted(calibration.xy_transforms))
+            parts.append(f"XY active for {sensors}")
+        if calibration.z_transforms:
+            sensors = ", ".join(f"ToF#{sensor_id}" for sensor_id in sorted(calibration.z_transforms))
+            z_text = f"Z push/pull active for {sensors}"
+            if calibration.push_mm is not None:
+                z_text += f" ({calibration.push_mm:.0f}mm)"
+            parts.append(z_text)
+        if parts:
+            return "Sensor calibration: " + "; ".join(parts) + "."
+        path = calibration.path or default_sensor_calibration_path()
         return f"Sensor calibration: not fitted yet ({path.name})."
 
     def _refresh_calibration_hint(self):
@@ -1593,7 +1612,7 @@ class GesturePuckApp:
         self._setup_hint_var.set(f"{base}  {self._calibration_hint_text()}")
 
     def _calibrate_sensors(self):
-        """Run the five-point ToF sensor alignment inside the Tkinter app."""
+        """Run the ToF XY plus Z push/pull calibration inside the Tkinter app."""
         if self._sensor_calibration_pending:
             self._set_status("Calibrating", ACCENT)
             return
@@ -1666,13 +1685,23 @@ class GesturePuckApp:
         self._sensor_calibration_dialog = None
         self._sensor_calibration_pending = False
         sensor_summary = ", ".join(
-            f"ToF#{sensor_id}:rms={info.get('rms_error_cells')}"
+            self._calibration_log_summary(sensor_id, info)
             for sensor_id, info in sorted(sensors.items(), key=lambda item: int(item[0]))
         )
         self.logger.log("sensor_calibration_done", f"path={path} {sensor_summary}")
         self._refresh_calibration_hint()
         self._set_status("Calibrated", ACCENT)
         self._start_engine(port=port, demo=False)
+
+    @staticmethod
+    def _calibration_log_summary(sensor_id, info):
+        z_info = info.get("z_calibration") if isinstance(info, dict) else None
+        z_text = ""
+        if isinstance(z_info, dict):
+            z_text = f":zspan={z_info.get('span_calibrated_mm')}"
+        rms = info.get("rms_error_cells")
+        rms_text = rms if rms is not None else "xy-skipped"
+        return f"ToF#{sensor_id}:rms={rms_text}{z_text}"
 
     def _on_sensor_calibration_cancelled(self, port, restart):
         self._sensor_calibration_dialog = None

@@ -17,6 +17,7 @@ The script focuses on reliability rather than just a flashy demo:
   - largest connected-component tracking
   - smoothed centroid/depth tracking
   - complete-stroke gesture classification with cooldown/hysteresis
+  - optional per-sensor XY and Z-axis calibration for fused push/pull detection
   - event logging, CSV logging, and gesture sample recording
   - optional macro execution through pyautogui
 
@@ -70,6 +71,8 @@ BINARY_MAGIC = b"MLD1"
 BINARY_PACKET_SIZE = len(BINARY_MAGIC) + 4 + 4 + 4 + N_PIXELS * 2 + 2
 TEXT_LINE_BUFFER_LIMIT = 4096
 DEFAULT_SENSOR_CALIBRATION_FILE = "sensor_calibration.json"
+DEFAULT_PUSH_MM = 220.0
+DEFAULT_MOTION_Z_SCALE_MM = 350.0
 GESTURE_NAMES = [
     "swipe_left",
     "swipe_right",
@@ -271,6 +274,16 @@ class ComponentCandidate:
     x: float
     y: float
 
+
+@dataclass
+class SensorCalibrationData:
+    path: Optional[Path]
+    xy_transforms: Dict[int, np.ndarray] = field(default_factory=dict)
+    z_transforms: Dict[int, Tuple[float, float]] = field(default_factory=dict)
+    weights: Dict[int, float] = field(default_factory=dict)
+    z_axis: Dict[str, float] = field(default_factory=dict)
+    push_mm: Optional[float] = None
+
 # ---------------------------------------------------------------------------
 # Small helpers
 # ---------------------------------------------------------------------------
@@ -353,14 +366,15 @@ def resolve_sensor_calibration_path(value: Optional[str]) -> Optional[Path]:
     return Path(value).expanduser()
 
 
-def load_sensor_calibration(value: Optional[str]) -> Tuple[Optional[Path], Dict[int, np.ndarray], Dict[int, float]]:
+def load_sensor_calibration_data(value: Optional[str]) -> SensorCalibrationData:
     path = resolve_sensor_calibration_path(value)
     if path is None or not path.exists():
-        return path, {}, {}
+        return SensorCalibrationData(path=path)
     with path.open("r", encoding="utf-8") as fh:
         payload = json.load(fh)
     sensors = payload.get("sensors", {}) if isinstance(payload, dict) else {}
     transforms: Dict[int, np.ndarray] = {}
+    z_transforms: Dict[int, Tuple[float, float]] = {}
     weights: Dict[int, float] = {}
     for key, info in sensors.items():
         try:
@@ -369,16 +383,60 @@ def load_sensor_calibration(value: Optional[str]) -> Tuple[Optional[Path], Dict[
             continue
         if not isinstance(info, dict):
             continue
-        matrix = np.asarray(info.get("matrix"), dtype=float)
+        try:
+            matrix = np.asarray(info.get("matrix"), dtype=float)
+        except (TypeError, ValueError):
+            matrix = np.asarray([])
         if matrix.shape == (2, 3) and np.all(np.isfinite(matrix)):
             transforms[sensor_id] = matrix
+        z_info = info.get("z_calibration")
+        if isinstance(z_info, dict):
+            try:
+                z_scale = float(z_info.get("scale", math.nan))
+                z_offset = float(z_info.get("offset", math.nan))
+            except (TypeError, ValueError):
+                z_scale = math.nan
+                z_offset = math.nan
+            if np.isfinite(z_scale) and np.isfinite(z_offset) and abs(z_scale) > 1e-6:
+                z_transforms[sensor_id] = (z_scale, z_offset)
         try:
             weight = float(info.get("sensor_weight", info.get("weight", math.nan)))
         except (TypeError, ValueError):
             weight = math.nan
         if np.isfinite(weight) and weight > 0:
             weights[sensor_id] = float(np.clip(weight, 0.1, 2.0))
-    return path, transforms, weights
+
+    z_axis_raw = payload.get("z_axis", {}) if isinstance(payload, dict) else {}
+    z_axis: Dict[str, float] = {}
+    if isinstance(z_axis_raw, dict):
+        for key, value in z_axis_raw.items():
+            if isinstance(value, (int, float)):
+                number = float(value)
+            else:
+                try:
+                    number = float(value)
+                except (TypeError, ValueError):
+                    continue
+            if np.isfinite(number):
+                z_axis[str(key)] = number
+
+    push_mm = z_axis.get("push_mm")
+    if push_mm is not None and push_mm <= 0:
+        push_mm = None
+
+    return SensorCalibrationData(
+        path=path,
+        xy_transforms=transforms,
+        z_transforms=z_transforms,
+        weights=weights,
+        z_axis=z_axis,
+        push_mm=push_mm,
+    )
+
+
+def load_sensor_calibration(value: Optional[str]) -> Tuple[Optional[Path], Dict[int, np.ndarray], Dict[int, float]]:
+    data = load_sensor_calibration_data(value)
+    return data.path, data.xy_transforms, data.weights
 
 
 def apply_orientation(frame: np.ndarray, *, flip_x: bool, flip_y: bool, transpose: bool) -> np.ndarray:
@@ -1729,17 +1787,41 @@ class FusedSignalPipeline:
     def __init__(self, args: argparse.Namespace):
         self.args = args
         self.requested_fusion_mode = str(getattr(args, "fusion_mode", "auto") or "auto").lower()
-        self.sensor_calibration_path, self.sensor_transforms, calibration_weights = load_sensor_calibration(
+        self.sensor_calibration = load_sensor_calibration_data(
             getattr(args, "sensor_calibration", "auto")
         )
-        self.calibrated_sensors = tuple(sorted(self.sensor_transforms))
+        self.sensor_calibration_path = self.sensor_calibration.path
+        self.sensor_transforms = self.sensor_calibration.xy_transforms
+        self.sensor_z_transforms = self.sensor_calibration.z_transforms
+        self.has_sensor_calibration = bool(self.sensor_transforms or self.sensor_z_transforms)
+        self.calibrated_sensors = tuple(sorted(set(self.sensor_transforms) | set(self.sensor_z_transforms)))
         if self.requested_fusion_mode == "auto":
             self.fusion_mode = "weighted-centroid" if self.sensor_transforms else "best-track"
         else:
             self.fusion_mode = self.requested_fusion_mode
         self._pipelines: Dict[int, SignalPipeline] = {}
         self._sensor_weights = dict(self.DEFAULT_SENSOR_WEIGHTS)
-        self._sensor_weights.update(calibration_weights)
+        self._sensor_weights.update(self.sensor_calibration.weights)
+        self._apply_depth_tuning_from_calibration()
+
+    def _apply_depth_tuning_from_calibration(self) -> None:
+        calibrated_push_mm = self.sensor_calibration.push_mm
+        if (
+            calibrated_push_mm is not None
+            and np.isfinite(calibrated_push_mm)
+            and calibrated_push_mm > 0
+            and abs(float(getattr(self.args, "push_mm", DEFAULT_PUSH_MM)) - DEFAULT_PUSH_MM) < 1e-6
+        ):
+            self.args.push_mm = float(calibrated_push_mm)
+
+        z_span = self.sensor_calibration.z_axis.get("span_mm")
+        if (
+            z_span is not None
+            and np.isfinite(z_span)
+            and z_span > 0
+            and abs(float(getattr(self.args, "motion_z_scale_mm", DEFAULT_MOTION_Z_SCALE_MM)) - DEFAULT_MOTION_Z_SCALE_MM) < 1e-6
+        ):
+            self.args.motion_z_scale_mm = float(np.clip(z_span * 1.35, 80.0, 600.0))
 
     def start_calibration(self) -> None:
         for pipeline in self._pipelines.values():
@@ -1788,7 +1870,7 @@ class FusedSignalPipeline:
             str(sensor_id): self._measurement_summary(
                 measurement,
                 sensor_weight=self._sensor_weights.get(sensor_id, 0.9),
-                calibrated=sensor_id in self.sensor_transforms,
+                calibrated=sensor_id in self.sensor_transforms or sensor_id in self.sensor_z_transforms,
             )
             for sensor_id, measurement in processed
         }
@@ -1801,7 +1883,8 @@ class FusedSignalPipeline:
                 "visible_sensors": [],
                 "available_sensors": list(primary.source_sensors),
                 "calibrated_sensors": list(self.calibrated_sensors),
-                "calibration_path": str(self.sensor_calibration_path) if self.sensor_transforms else None,
+                "calibration_path": str(self.sensor_calibration_path) if self.has_sensor_calibration else None,
+                "calibrated_push_mm": round_float(float(getattr(self.args, "push_mm", math.nan)), 3),
                 "requested_mode": self.requested_fusion_mode,
                 "sensor_measurements": sensor_meta,
             }
@@ -1875,7 +1958,8 @@ class FusedSignalPipeline:
                 "visible_sensors": list(visible_ids),
                 "available_sensors": [sensor_id for sensor_id, _ in processed],
                 "calibrated_sensors": list(self.calibrated_sensors),
-                "calibration_path": str(self.sensor_calibration_path) if self.sensor_transforms else None,
+                "calibration_path": str(self.sensor_calibration_path) if self.has_sensor_calibration else None,
+                "calibrated_push_mm": round_float(float(getattr(self.args, "push_mm", math.nan)), 3),
                 "requested_mode": self.requested_fusion_mode,
                 "best_sensor": best_id,
                 "weights": {str(sensor_id): round_float(weight, 5) for sensor_id, _m, weight in visible_tracks},
@@ -1885,20 +1969,34 @@ class FusedSignalPipeline:
         return fused
 
     def _apply_sensor_calibration(self, sensor_id: int, measurement: Measurement) -> None:
+        calibrated_parts: List[str] = []
         matrix = self.sensor_transforms.get(sensor_id)
-        if matrix is None:
-            return
-        if not (measurement.visible and np.isfinite(measurement.x) and np.isfinite(measurement.y)):
-            return
+        if (
+            matrix is not None
+            and measurement.visible
+            and np.isfinite(measurement.x)
+            and np.isfinite(measurement.y)
+        ):
+            x, y = float(measurement.x), float(measurement.y)
+            measurement.x = float(matrix[0, 0] * x + matrix[0, 1] * y + matrix[0, 2])
+            measurement.y = float(matrix[1, 0] * x + matrix[1, 1] * y + matrix[1, 2])
 
-        x, y = float(measurement.x), float(measurement.y)
-        measurement.x = float(matrix[0, 0] * x + matrix[0, 1] * y + matrix[0, 2])
-        measurement.y = float(matrix[1, 0] * x + matrix[1, 1] * y + matrix[1, 2])
+            dx, dy = float(measurement.field_dx), float(measurement.field_dy)
+            measurement.field_dx = float(matrix[0, 0] * dx + matrix[0, 1] * dy)
+            measurement.field_dy = float(matrix[1, 0] * dx + matrix[1, 1] * dy)
+            calibrated_parts.append("xy")
 
-        dx, dy = float(measurement.field_dx), float(measurement.field_dy)
-        measurement.field_dx = float(matrix[0, 0] * dx + matrix[0, 1] * dy)
-        measurement.field_dy = float(matrix[1, 0] * dx + matrix[1, 1] * dy)
-        measurement.status = f"{measurement.status}; calibrated ToF#{sensor_id}"
+        z_transform = self.sensor_z_transforms.get(sensor_id)
+        if z_transform is not None and measurement.visible and np.isfinite(measurement.z):
+            z_scale, z_offset = z_transform
+            measurement.z = float(z_scale * float(measurement.z) + z_offset)
+            if np.isfinite(measurement.nearest):
+                measurement.nearest = float(z_scale * float(measurement.nearest) + z_offset)
+            calibrated_parts.append("z")
+
+        if not calibrated_parts:
+            return
+        measurement.status = f"{measurement.status}; calibrated ToF#{sensor_id} {','.join(calibrated_parts)}"
 
     @staticmethod
     def _measurement_summary(m: Measurement, *, sensor_weight: float, calibrated: bool = False) -> Dict[str, object]:
@@ -3302,7 +3400,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     gest.add_argument("--motion-prev-grace-s", type=float, default=0.22)
     gest.add_argument("--motion-field-weight", type=float, default=0.35)
     gest.add_argument("--motion-z-weight", type=float, default=0.55)
-    gest.add_argument("--motion-z-scale-mm", type=float, default=350.0)
+    gest.add_argument("--motion-z-scale-mm", type=float, default=DEFAULT_MOTION_Z_SCALE_MM)
     gest.add_argument("--motion-z-cap", type=float, default=0.8)
     gest.add_argument("--min-motion-peak", type=float, default=0.34)
     gest.add_argument("--min-motion-path", type=float, default=0.75)
@@ -3317,7 +3415,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     gest.add_argument("--swipe-cells", type=float, default=1.25)
     gest.add_argument("--swipe-dominance", type=float, default=1.28)
     gest.add_argument("--min-swipe-speed", type=float, default=1.1)
-    gest.add_argument("--push-mm", type=float, default=220)
+    gest.add_argument("--push-mm", type=float, default=DEFAULT_PUSH_MM)
     gest.add_argument("--push-max-xy-cells", type=float, default=1.15)
     gest.add_argument("--hold-s", type=float, default=0.70)
     gest.add_argument("--hold-radius-cells", type=float, default=1.55)
