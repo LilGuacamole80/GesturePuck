@@ -1,0 +1,37 @@
+{
+  "id": "figma",
+  "name": "Figma",
+  "icon": "🔬",
+  "description": "Zoom, undo/redo, and viewport controls for Figma.",
+  "version": "1.0.0",
+  "gestures": {
+    "swipe_left": {
+      "label": "Undo",
+      "macro": "ctrl+z"
+    },
+    "swipe_right": {
+      "label": "Redo",
+      "macro": "ctrl+shift+z"
+    },
+    "swipe_up": {
+      "label": "Zoom In",
+      "macro": "ctrl+equal"
+    },
+    "swipe_down": {
+      "label": "Zoom Out",
+      "macro": "ctrl+minus"
+    },
+    "push": {
+      "label": "Fit to Screen",
+      "macro": "shift+1"
+    },
+    "pull": {
+      "label": "Export Selection",
+      "macro": "ctrl+shift+e"
+    },
+    "hold_center": {
+      "label": "Exit Pack",
+      "macro": "__EXIT_PACK__"
+    }
+  }
+}

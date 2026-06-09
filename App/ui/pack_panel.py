@@ -85,11 +85,19 @@ def _lbl(parent, text, fg=TEXT_DIM, font=FONT_LABEL, bg=BG, **kw):
 
 
 # ── Import helpers ─────────────────────────────────────────────────────────────
+def _default_import_dir() -> str | None:
+    downloadable = Path(__file__).resolve().parents[2] / "Server" / "downloadable_packs"
+    if downloadable.exists():
+        return str(downloadable)
+    return None
+
+
 def _do_import(mode_manager, on_success: Callable, root: tk.Misc):
     """Open a file dialog and import the chosen .gpack."""
     path = filedialog.askopenfilename(
         parent=root,
         title="Import GesturePuck Pack",
+        initialdir=_default_import_dir(),
         filetypes=[("GesturePuck Pack", "*.gpack"), ("JSON", "*.json"), ("All files", "*.*")],
     )
     if not path:

@@ -18,8 +18,8 @@ import uuid
 import psycopg2
 import psycopg2.extras
 
-OIDC_CLIENT_ID = os.environ["OIDC_CLIENT_ID"]
-OIDC_CLIENT_SECRET = os.environ["OIDC_CLIENT_SECRET"]
+OIDC_CLIENT_ID = os.environ.get("OIDC_CLIENT_ID", "")
+OIDC_CLIENT_SECRET = os.environ.get("OIDC_CLIENT_SECRET", "")
 OIDC_REDIRECT_URI = os.environ.get("OIDC_REDIRECT_URI")
 
 OIDC_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"

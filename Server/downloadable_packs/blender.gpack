@@ -1,0 +1,37 @@
+{
+  "id": "blender",
+  "name": "Blender",
+  "icon": "🏗️",
+  "description": "Viewport presets, render, and transform shortcuts for Blender.",
+  "version": "1.0.0",
+  "gestures": {
+    "swipe_left": {
+      "label": "Front View",
+      "macro": "numpad1"
+    },
+    "swipe_right": {
+      "label": "Side View (Right)",
+      "macro": "numpad3"
+    },
+    "swipe_up": {
+      "label": "Top View",
+      "macro": "numpad7"
+    },
+    "swipe_down": {
+      "label": "Camera View",
+      "macro": "numpad0"
+    },
+    "push": {
+      "label": "Render",
+      "macro": "f12"
+    },
+    "pull": {
+      "label": "Toggle Wireframe",
+      "macro": "alt+z"
+    },
+    "hold_center": {
+      "label": "Exit Pack",
+      "macro": "__EXIT_PACK__"
+    }
+  }
+}

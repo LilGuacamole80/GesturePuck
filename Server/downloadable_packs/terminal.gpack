@@ -1,0 +1,37 @@
+{
+  "id": "terminal",
+  "name": "Terminal",
+  "icon": "🖥️",
+  "description": "Power-user terminal gestures — navigation, git status, and quick commands.",
+  "version": "1.0.0",
+  "gestures": {
+    "swipe_left": {
+      "label": "Previous Command",
+      "macro": "up+enter"
+    },
+    "swipe_right": {
+      "label": "List Files (ls -la)",
+      "macro": "shell:ls -la"
+    },
+    "swipe_up": {
+      "label": "Git Status",
+      "macro": "shell:git status"
+    },
+    "swipe_down": {
+      "label": "Clear Terminal",
+      "macro": "ctrl+l"
+    },
+    "push": {
+      "label": "Go Up a Directory (cd ..)",
+      "macro": "shell:cd .."
+    },
+    "pull": {
+      "label": "List Directory Tree",
+      "macro": "shell:ls -la"
+    },
+    "hold_center": {
+      "label": "Exit Pack",
+      "macro": "__EXIT_PACK__"
+    }
+  }
+}

@@ -31,9 +31,7 @@ Imported packs are stored individually as JSON files under:
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
-from typing import Any
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 TMP_DIR   = Path("/tmp")
@@ -53,8 +51,34 @@ class PackValidationError(ValueError):
     pass
 
 
+def normalize(data: dict) -> dict:
+    """
+    Return a pack dict in the current schema.
+
+    Older downloadable packs used top-level "gestures" instead of "modes".
+    Treat those gestures as a single default mode so the app can import both
+    formats.
+    """
+    if not isinstance(data, dict):
+        raise PackValidationError("Pack must be a JSON object")
+
+    normalized = dict(data)
+    if "modes" not in normalized and isinstance(normalized.get("gestures"), dict):
+        normalized["modes"] = [
+            {
+                "id": "default",
+                "name": "Default",
+                "icon": normalized.get("icon", ""),
+                "gestures": normalized["gestures"],
+            }
+        ]
+
+    return normalized
+
+
 def validate(data: dict) -> None:
     """Raise PackValidationError if the pack dict is malformed."""
+    data = normalize(data)
     missing = REQUIRED_TOP - data.keys()
     if missing:
         raise PackValidationError(f"Pack missing required fields: {missing}")
@@ -80,12 +104,12 @@ def import_pack(source_path: str | Path) -> dict:
         raise ValueError(f"Expected a .gpack file, got: {source_path.suffix}")
 
     raw = source_path.read_text(encoding="utf-8")
-    data = json.loads(raw)
+    data = normalize(json.loads(raw))
     validate(data)
 
     _ensure_dir()
     dest = PACKS_DIR / f"{data['id']}.gpack"
-    shutil.copy2(source_path, dest)
+    dest.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     return data
 
 
@@ -94,6 +118,7 @@ def import_pack_from_dict(data: dict) -> dict:
     Import a pack from an already-parsed dict (e.g. drag-and-drop bytes).
     Validates and writes to disk.
     """
+    data = normalize(data)
     validate(data)
     _ensure_dir()
     dest = PACKS_DIR / f"{data['id']}.gpack"
@@ -107,7 +132,7 @@ def load_all_packs() -> list[dict]:
     packs = []
     for path in sorted(PACKS_DIR.glob("*.gpack")):
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = normalize(json.loads(path.read_text(encoding="utf-8")))
             validate(data)
             packs.append(data)
         except Exception as exc:
@@ -137,7 +162,7 @@ def get_pack(pack_id: str) -> dict | None:
     if not dest.exists():
         return None
     try:
-        data = json.loads(dest.read_text(encoding="utf-8"))
+        data = normalize(json.loads(dest.read_text(encoding="utf-8")))
         validate(data)
         return data
     except Exception:

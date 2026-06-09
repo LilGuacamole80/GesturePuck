@@ -1,0 +1,37 @@
+{
+  "id": "keynote_powerpoint",
+  "name": "Presentation",
+  "icon": "📊",
+  "description": "Slide navigation and presentation controls for PowerPoint and Keynote.",
+  "version": "1.0.0",
+  "gestures": {
+    "swipe_left": {
+      "label": "Previous Slide",
+      "macro": "left"
+    },
+    "swipe_right": {
+      "label": "Next Slide",
+      "macro": "right"
+    },
+    "swipe_up": {
+      "label": "Start Slideshow",
+      "macro": "f5"
+    },
+    "swipe_down": {
+      "label": "End Slideshow",
+      "macro": "esc"
+    },
+    "push": {
+      "label": "Black Screen",
+      "macro": "b"
+    },
+    "pull": {
+      "label": "White Screen",
+      "macro": "w"
+    },
+    "hold_center": {
+      "label": "Exit Pack",
+      "macro": "__EXIT_PACK__"
+    }
+  }
+}

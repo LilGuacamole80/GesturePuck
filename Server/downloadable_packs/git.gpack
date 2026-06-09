@@ -1,40 +1,36 @@
 {
   "id": "git",
   "name": "Git",
-  "icon": "🐙",
-  "description": "Gesture mappings for common Git operations.",
+  "icon": "🌿",
+  "description": "Git workflow gestures — stage, commit, push, pull, and branch inspection.",
   "version": "1.0.0",
   "gestures": {
     "swipe_left": {
-      "label": "Undo last commit (soft reset)",
-      "macro": "git reset --soft HEAD~1"
+      "label": "Soft Reset (undo last commit)",
+      "macro": "shell:git reset --soft HEAD~1"
     },
     "swipe_right": {
-      "label": "Git status",
-      "macro": "git status"
+      "label": "Git Pull",
+      "macro": "shell:git pull origin main"
     },
     "swipe_up": {
-      "label": "Stage, commit & push",
-      "macro": [
-        "git add .",
-        "git commit -m \"$(git diff --cached --name-only | head -5 | paste -sd ', ' -) — auto-commit\"",
-        "git push origin main"
-      ]
+      "label": "Add, Commit & Push",
+      "macro": "shell:git add . && git commit -m \"$(git diff --cached --name-only | tr '\\n' ' ' | sed 's/ $//' | xargs -I{} echo 'update: {}')\" && git push origin main"
     },
     "swipe_down": {
-      "label": "Pull latest",
-      "macro": "git pull origin main"
+      "label": "Git Status",
+      "macro": "shell:git status"
     },
     "push": {
-      "label": "Create & switch new branch",
-      "macro": "git checkout -b feature/$(date +%Y%m%d)"
+      "label": "New Branch",
+      "macro": "shell:git checkout -b gesture/$(date +%Y%m%d-%H%M)"
     },
     "pull": {
-      "label": "View log (oneline)",
-      "macro": "git log --oneline -10"
+      "label": "Git Log (last 5)",
+      "macro": "shell:git log --oneline -5"
     },
     "hold_center": {
-      "label": "Exit pack / default mode",
+      "label": "Exit Pack",
       "macro": "__EXIT_PACK__"
     }
   }

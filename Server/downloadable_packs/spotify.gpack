@@ -1,0 +1,37 @@
+{
+  "id": "spotify",
+  "name": "Spotify",
+  "icon": "🎵",
+  "description": "Playback, track navigation, and volume control for Spotify.",
+  "version": "1.0.0",
+  "gestures": {
+    "swipe_left": {
+      "label": "Previous Track",
+      "macro": "ctrl+left"
+    },
+    "swipe_right": {
+      "label": "Next Track",
+      "macro": "ctrl+right"
+    },
+    "swipe_up": {
+      "label": "Volume Up",
+      "macro": "ctrl+up"
+    },
+    "swipe_down": {
+      "label": "Volume Down",
+      "macro": "ctrl+down"
+    },
+    "push": {
+      "label": "Play / Pause",
+      "macro": "space"
+    },
+    "pull": {
+      "label": "Toggle Shuffle",
+      "macro": "ctrl+s"
+    },
+    "hold_center": {
+      "label": "Exit Pack",
+      "macro": "__EXIT_PACK__"
+    }
+  }
+}

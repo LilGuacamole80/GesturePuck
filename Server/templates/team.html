@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Team - GesturePuck</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav" aria-label="Primary navigation">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>GesturePuck</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/shop">Packs</a></li>
+        <li><a href="/team" aria-current="page">Team</a></li>
+        <li><a href="/careers">Careers</a></li>
+        <li><a href="/login">Login</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="subpage-hero">
+      <p class="eyebrow">The people behind the puck</p>
+      <h1 class="page-title">A compact team building a compact interface.</h1>
+      <p class="page-lead">GesturePuck brings together embedded systems, sensing, desktop software, and product design into one hands-free control experience.</p>
+    </section>
+
+    <section class="section">
+      <div class="people-grid">
+        <article class="person-card">
+          <div class="avatar">RC</div>
+          <h3>Rama Chunduri</h3>
+          <p class="muted">Hardware, app integration, and product direction for the GesturePuck prototype.</p>
+        </article>
+        <article class="person-card">
+          <div class="avatar">HW</div>
+          <h3>Maxwell Muranov</h3>
+          <p class="muted">Sensor calibration, ESP32 firmware, gesture detection, and device feedback loops.</p>
+        </article>
+        <article class="person-card">
+          <div class="avatar">SW</div>
+          <h3>Brandyn Er</h3>
+          <p class="muted">Desktop pack importing, macro execution, web downloads, and app-specific workflows.</p>
+        </article>
+        <article class="person-card">
+          <div class="avatar">SW</div>
+          <h3>Kris Lin</h3>
+          <p class="muted">Desktop pack importing, macro execution, web downloads, and app-specific workflows.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">How we build</p>
+          <h2>Prototype fast, keep the interaction honest.</h2>
+          <p class="page-lead">Every gesture has to be readable, repeatable, and useful in the moment. The team tests around that constraint first, then polishes the interface around it.</p>
+        </div>
+      </div>
+      <div class="grid">
+        <article class="card">
+          <div class="card-icon">S</div>
+          <h3>Sensing</h3>
+          <p>Turn raw motion data into stable intent.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon">M</div>
+          <h3>Mapping</h3>
+          <p>Connect gestures to actions that matter in each app.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon">U</div>
+          <h3>Usability</h3>
+          <p>Keep controls visible and reversible in the desktop UI.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon">P</div>
+          <h3>Packs</h3>
+          <p>Ship workflows as files that are easy to install and share.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <span>GesturePuck Team</span>
+      <span>Built around motion, context, and control.</span>
+    </div>
+  </footer>
+</body>
+</html>

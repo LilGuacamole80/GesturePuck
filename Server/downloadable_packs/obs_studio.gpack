@@ -1,0 +1,37 @@
+{
+  "id": "obs_studio",
+  "name": "OBS Studio",
+  "icon": "🔴",
+  "description": "Scene switching, stream control, and mute toggle for OBS Studio.",
+  "version": "1.0.0",
+  "gestures": {
+    "swipe_left": {
+      "label": "Scene 1",
+      "macro": "ctrl+1"
+    },
+    "swipe_right": {
+      "label": "Scene 2",
+      "macro": "ctrl+2"
+    },
+    "swipe_up": {
+      "label": "Start / Stop Recording",
+      "macro": "ctrl+shift+r"
+    },
+    "swipe_down": {
+      "label": "Scene 3",
+      "macro": "ctrl+3"
+    },
+    "push": {
+      "label": "Start / Stop Stream",
+      "macro": "ctrl+shift+s"
+    },
+    "pull": {
+      "label": "Toggle Studio Mode",
+      "macro": "ctrl+t"
+    },
+    "hold_center": {
+      "label": "Mute / Unmute Mic",
+      "macro": "ctrl+m"
+    }
+  }
+}

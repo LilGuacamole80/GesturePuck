@@ -1,0 +1,37 @@
+{
+  "id": "davinci_resolve",
+  "name": "DaVinci Resolve",
+  "icon": "🎬",
+  "description": "Timeline scrubbing, cutting, and playback controls for DaVinci Resolve.",
+  "version": "1.0.0",
+  "gestures": {
+    "swipe_left": {
+      "label": "Scrub Back 10 Frames",
+      "macro": "shift+left"
+    },
+    "swipe_right": {
+      "label": "Scrub Forward 10 Frames",
+      "macro": "shift+right"
+    },
+    "swipe_up": {
+      "label": "Toggle Fullscreen Preview",
+      "macro": "ctrl+f"
+    },
+    "swipe_down": {
+      "label": "Play / Pause",
+      "macro": "space"
+    },
+    "push": {
+      "label": "Cut Clip at Playhead",
+      "macro": "ctrl+b"
+    },
+    "pull": {
+      "label": "Render (deliver page)",
+      "macro": "ctrl+shift+e"
+    },
+    "hold_center": {
+      "label": "Exit Pack",
+      "macro": "__EXIT_PACK__"
+    }
+  }
+}

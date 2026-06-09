@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Careers - GesturePuck</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav" aria-label="Primary navigation">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>GesturePuck</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/shop">Packs</a></li>
+        <li><a href="/team">Team</a></li>
+        <li><a href="/careers" aria-current="page">Careers</a></li>
+        <li><a href="/login">Login</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="subpage-hero">
+      <p class="eyebrow">Build the next control surface</p>
+      <h1 class="page-title">GesturePuck is small, but the problem space is wide open.</h1>
+      <p class="page-lead">We care about people who can move between hardware, software, and human behavior without losing sight of the actual interaction.</p>
+      <div class="actions">
+        <a class="button primary" href="mailto:hello@gesturepuck.dev">Start a conversation</a>
+        <a class="button" href="/team">Meet the team</a>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Open tracks</p>
+          <h2>Areas where we want sharp hands and sharper taste.</h2>
+        </div>
+      </div>
+      <div class="role-grid">
+        <article class="role-card">
+          <div class="card-icon">FW</div>
+          <h3>Embedded firmware</h3>
+          <p class="muted">ESP32 streaming, sensor timing, reliability, and device feedback.</p>
+        </article>
+        <article class="role-card">
+          <div class="card-icon">UX</div>
+          <h3>Interaction design</h3>
+          <p class="muted">Gesture vocabulary, mode switching, and confidence-building UI states.</p>
+        </article>
+        <article class="role-card">
+          <div class="card-icon">DS</div>
+          <h3>Signal processing</h3>
+          <p class="muted">Noise handling, gesture classification, calibration, and repeatability.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="media-grid">
+        <div>
+          <p class="eyebrow">What matters here</p>
+          <h2>Make technology disappear into timing.</h2>
+          <p class="page-lead">A gesture product succeeds when the user stops thinking about the gesture and starts trusting the result. That takes careful measurement, quick iteration, and a healthy suspicion of anything that only works once.</p>
+        </div>
+        <div class="stat-row">
+          <div class="stat"><strong>HW</strong><span>physical sensing and feedback</span></div>
+          <div class="stat"><strong>SW</strong><span>desktop controls and pack runtime</span></div>
+          <div class="stat"><strong>UX</strong><span>clear, learnable interactions</span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <span>GesturePuck Careers</span>
+      <span>Curious builders welcome.</span>
+    </div>
+  </footer>
+</body>
+</html>
